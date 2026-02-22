@@ -23,7 +23,7 @@ async def show_title(screen):
         screen.fill((136, 136, 136))
         alpha = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2
         
-        text_sub = font_sub.render("かいぶつから逃げ切れ！", True, (220, 220, 220))            
+        text_sub = font_sub.render("かいぶつから逃げ切れ！", True, (220, 220, 220))
         screen.blit(text_sub, text_sub.get_rect(center=(400, 360)))
         
         # ここから下は if の中（右側にスペースを入れる）にする
