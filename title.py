@@ -24,7 +24,7 @@ async def show_title(screen):
         alpha = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2
         if alpha > 0.3:
             text_sub = font_sub.render("かいぶつから逃げ切れ！", True, (220, 220, 220))            
-            screen.blit(text_sub, text_sub.get_rect(center=(400, 300)))
+            screen.blit(text_sub, text_sub.get_rect(center=(400, 360)))
         
             txt_main = font_main.render("スペースキーでスタート", True, (255, 255, 255))
             screen.blit(txt_main, txt_main.get_rect(center=(400, 300)))
