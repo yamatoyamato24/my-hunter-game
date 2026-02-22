@@ -1,12 +1,18 @@
 import pygame
 import asyncio
 
-def load_game_image(path, size):
+def load_game_image(path, target_width): # 幅だけ指定するように変更
     try:
         img = pygame.image.load(path).convert_alpha()
-        return pygame.transform.scale(img, size)
+        # 元の画像のサイズを取得
+        org_width, org_height = img.get_size()
+        # 指定した「幅」に合わせて「高さ」を計算（比率を維持）
+        aspect_ratio = org_height / org_width
+        target_height = int(target_width * aspect_ratio)
+
+        return pygame.transform.scale(img, (target_width, target_height))
     except:
-        surf = pygame.Surface(size)
+        surf = pygame.Surface((target_width, target_width)) # 失敗時は正方形
         surf.fill((200, 200, 200))
         return surf
 
