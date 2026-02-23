@@ -18,7 +18,7 @@ def load_game_image(path, target_width):
 
 class Player:
     def __init__(self):
-        self.image = load_game_image("assets/run_away.png", 100) # 幅100で固定
+        self.image = load_game_image("assets/run_away.png", 60) # 幅60で固定
         self.rect = self.image.get_rect(center=(400, 300))
         self.mask = pygame.mask.from_surface(self.image)
         self.speed = 5
@@ -92,16 +92,31 @@ class Controller:
 
 async def play_game(screen):
     bg, player, enemy, controller = Background(), Player(), Enemy(), Controller()
+    
+    # ① プレイヤーを小さく調整（クラス側の初期化でサイズ指定）
+    player.image = load_game_image("assets/run_away.png", 60) # 幅60に
+    player.rect = player.image.get_rect(center=(400, 300))
+    player.mask = pygame.mask.from_surface(player.image)
+    
     clock, score = pygame.time.Clock(), 0
-    font = pygame.font.SysFont(None, 36)
+
+    # ② カウントダウン用の大きなフォントを用意
+    font_ui = pygame.font.SysFont(None, 36)
+    font_count = pygame.font.SysFont(None, 150) # サイズ150！
+
     start_ticks = pygame.time.get_ticks()
 
     while True:
-        countdown = 3 - (pygame.time.get_ticks() - start_ticks) // 1000
+        # カウントダウン数秒の計算
+        seconds_passed = (pygame.time.get_ticks() - start_ticks) // 1000
+        countdown = 3 - seconds_passed
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return "QUIT", 0
         
         ctrl = controller.get_input()
+
+        # カウントダウン終了後のみ動かす
         if countdown <= 0:
             if ctrl["up"]: player.rect.y -= player.speed
             if ctrl["down"]: player.rect.y += player.speed
@@ -115,17 +130,35 @@ async def play_game(screen):
         if player.mask.overlap(enemy.mask, (enemy.rect.x - player.rect.x, enemy.rect.y - player.rect.y)) and player.invincible_timer <= 0:
             player.hp -= 1
             player.invincible_timer = 60
-            if player.hp <= 0: return "GAMEOVER", int(score)
 
+            # HPがなくなったら GAMEOVER という言葉を main.py に返す
+            if player.hp <= 0:
+                #ゲームオーバー画面へ切り替え
+                await asyncio.sleep(0.3) #少し余韻を残す
+                return "GAMEOVER", int(score)
+
+        # --- 描画処理 ---
         bg.draw(screen)
         player.draw(screen)
         enemy.draw(screen)
         controller.draw(screen)
         
-        screen.blit(font.render(f"LIFE:{player.hp} SCORE:{int(score)}", True, (255,255,255)), (20,20))
+        # UI表示
+        txt_ui = font_ui.render(f"LIFE:{player.hp} SCORE:{int(score)}", True, (255,255,255))
+        screen.blit(txt_ui, (20,20))
+
+        # カウントダウン中は画面を暗くし、大きな数字を出す
         if countdown > 0:
-            screen.blit(font.render(str(countdown), True, (255,215,0)), (400,300))
-        
+            # 画面全体を覆う半透明の黒いシート
+            overlay = pygame.Surface((800, 600), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150)) # (赤, 緑, 青, 透明度0-255)
+            screen.blit(overlay, (0, 0))
+
+# 大きな数字を描画
+            count_surf = font_count.render(str(countdown), True, (255, 215, 0)) # 金色
+            count_rect = count_surf.get_rect(center=(400, 300))
+            screen.blit(count_surf, count_rect)
+
         pygame.display.flip()
         clock.tick(60)
         await asyncio.sleep(0)
