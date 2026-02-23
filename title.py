@@ -38,12 +38,16 @@ async def show_title(screen):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return "QUIT"
+            
             # スペースキーかクリックで""PLAY"を返して終了
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            if (event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE) or \
+                (event.type == pygame.MOUSEBUTTONDOWN):
+            
+                pygame.mixer.music.stop() # 音楽を止める処理
+                await asyncio.sleep(0.01) # ★ここ！一瞬だけ(0.01秒)待つ
                 return "PLAY"
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                return "PLAY"
-
+            
+        # --- ここから下は while ループを維持するための必須処理 ---
         pygame.display.flip()
         clock.tick(60)
-        await asyncio.sleep(0)
+        await asyncio.sleep(0) 
