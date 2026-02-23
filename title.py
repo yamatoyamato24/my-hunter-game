@@ -19,26 +19,31 @@ async def show_title(screen):
         font_sub = pygame.font.SysFont(None, 25)
 
     clock = pygame.time.Clock()
+
+    # ループ開始
     while True:
         screen.fill((136, 136, 136))
-        alpha = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2
+        alpha = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2 #点滅の計算
         
+        #サブタイトル表示
         text_sub = font_sub.render("かいぶつから逃げ切れ！", True, (220, 220, 220))
         screen.blit(text_sub, text_sub.get_rect(center=(400, 360)))
         
-        # ここから下は if の中（右側にスペースを入れる）にする
+        # メインタイトル点滅表示
         if alpha > 0.3:
             txt_main = font_main.render("スペースキーでスタート", True, (255, 255, 255))
             screen.blit(txt_main, txt_main.get_rect(center=(400, 300)))
         
-        
+        # イベント処理
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: return "QUIT"
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE: return "PLAY"
-            if event.type == pygame.MOUSEBUTTONDOWN: return "PLAY"
+            if event.type == pygame.QUIT:
+                return "QUIT"
+            # スペースキーかクリックで""PLAY"を返して終了
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                return "PLAY"
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                return "PLAY"
 
         pygame.display.flip()
         clock.tick(60)
         await asyncio.sleep(0)
-        # ← whileループが終わった後にここ（スペース4つ分）に書く
-        return "PLAY"
