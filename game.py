@@ -1,24 +1,24 @@
 import pygame
 import asyncio
 
-def load_game_image(path, target_width): # 幅だけ指定するように変更
+# --- 画像読み込み関数（縦横比を維持） ---
+def load_game_image(path, target_width):
     try:
         img = pygame.image.load(path).convert_alpha()
-        # 元の画像のサイズを取得
         org_width, org_height = img.get_size()
-        # 指定した「幅」に合わせて「高さ」を計算（比率を維持）
+        # 比率を計算して高さを自動調整
         aspect_ratio = org_height / org_width
         target_height = int(target_width * aspect_ratio)
-
         return pygame.transform.scale(img, (target_width, target_height))
     except:
-        surf = pygame.Surface((target_width, target_width)) # 失敗時は正方形
+        # 読み込めない時の代わり
+        surf = pygame.Surface((target_width, target_width))
         surf.fill((200, 200, 200))
         return surf
 
 class Player:
     def __init__(self):
-        self.image = load_game_image("assets/run_away.png", (100, 100))
+        self.image = load_game_image("assets/run_away.png", 100) # 幅100で固定
         self.rect = self.image.get_rect(center=(400, 300))
         self.mask = pygame.mask.from_surface(self.image)
         self.speed = 5
@@ -40,7 +40,7 @@ class Player:
 
 class Enemy:
     def __init__(self):
-        self.image = load_game_image("assets/enemy.png", (300, 300))
+        self.image = load_game_image("assets/enemy.png", 300) # 幅300で固定
         self.rect = self.image.get_rect(topleft=(20, 20))
         self.mask = pygame.mask.from_surface(self.image)
         self.speed = 2
@@ -56,8 +56,15 @@ class Enemy:
 
 class Background:
     def __init__(self):
-        self.image = load_game_image("assets/background.png", (800, 600))
+        # 背景は画面いっぱいに広げる
+        try:
+            self.image = pygame.image.load("assets/background.png").convert()
+            self.image = pygame.transform.scale(self.image, (800, 600))
+        except:
+            self.image = pygame.Surface((800, 600))
+            self.image.fill((34, 139, 34))
         self.rect = self.image.get_rect()
+
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
@@ -67,9 +74,11 @@ class Controller:
         self.down_rect = pygame.Rect(700, 530, 50, 50)
         self.left_rect = pygame.Rect(640, 490, 50, 50)
         self.right_rect = pygame.Rect(760, 490, 50, 50)
+
     def draw(self, screen):
         for r in [self.up_rect, self.down_rect, self.left_rect, self.right_rect]:
             pygame.draw.rect(screen, (255, 255, 255, 100), r, 2)
+
     def get_input(self):
         mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
@@ -98,15 +107,21 @@ async def play_game(screen):
             if ctrl["down"]: player.rect.y += player.speed
             if ctrl["left"]: player.rect.x -= player.speed
             if ctrl["right"]: player.rect.x += player.speed
-            player.update(); enemy.update(player.rect)
+            player.update()
+            enemy.update(player.rect)
             score += 1 / 60 
 
+        # マスク判定（ズレの計算を修正して正確に）
         if player.mask.overlap(enemy.mask, (enemy.rect.x - player.rect.x, enemy.rect.y - player.rect.y)) and player.invincible_timer <= 0:
             player.hp -= 1
             player.invincible_timer = 60
             if player.hp <= 0: return "GAMEOVER", int(score)
 
-        bg.draw(screen); player.draw(screen); enemy.draw(screen); controller.draw(screen)
+        bg.draw(screen)
+        player.draw(screen)
+        enemy.draw(screen)
+        controller.draw(screen)
+        
         screen.blit(font.render(f"LIFE:{player.hp} SCORE:{int(score)}", True, (255,255,255)), (20,20))
         if countdown > 0:
             screen.blit(font.render(str(countdown), True, (255,215,0)), (400,300))
