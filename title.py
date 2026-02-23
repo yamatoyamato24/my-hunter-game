@@ -40,3 +40,5 @@ async def show_title(screen):
         pygame.display.flip()
         clock.tick(60)
         await asyncio.sleep(0)
+        # ← whileループが終わった後にここ（スペース4つ分）に書く
+        return "PLAY"
