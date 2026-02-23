@@ -14,8 +14,10 @@ async def main():
 
     while state != "QUIT":
         if state == "TITLE":
+            # ここで受け取った state が "PLAY" になる必要がある
             state = await title.show_title(screen)
-        elif state == "PLAY":
+        elif state == "PLAY":  # ← ここが "PLAY" と一致しているか！
+            print(f"今のステートは: {state}") # ★これを追加
             state, last_score = await game.play_game(screen)
         elif state == "GAMEOVER":
             state = await gameover.show_gameover(screen, last_score)
