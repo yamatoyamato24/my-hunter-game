@@ -70,64 +70,69 @@ class Background:
 
 class Controller:
     def __init__(self):
-        # 十字キーの基準位置（画面下部の中央など、縦長画面に合わせて調整してください）
-        # x, y は十字キーの中心付近
-        self.cx, self.cy = 400, 800  # 画面を縦長にしたとのことなので yを大きめに設定
-        self.size = 70        # ボタン1つのサイズ
-        self.pad_radius = 140 #後ろの丸い土台の半径
-
-        # 判定用のRect（ケムコ風十字配置）
+        self.cx, self.cy = 400, 800 
+        self.size = 90
+        self.pad_radius = 180 
+        
+        # 十字ボタン（上下左右）
         self.up_rect    = pygame.Rect(self.cx - self.size//2, self.cy - self.size*1.6, self.size, self.size)
         self.down_rect  = pygame.Rect(self.cx - self.size//2, self.cy + self.size*0.6, self.size, self.size)
         self.left_rect  = pygame.Rect(self.cx - self.size*1.6, self.cy - self.size//2, self.size, self.size)
         self.right_rect = pygame.Rect(self.cx + self.size*0.6, self.cy - self.size//2, self.size, self.size)
 
-    def draw(self, screen):
-        # --- 半透明の仮想パッドを描画 ---
-        # 1. パッド専用の透明なシートを作る
-        pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
-        
-        # マウスの状態をその場でチェック（感触のため）
-        m_pos = pygame.mouse.get_pos()
-        m_pressed = pygame.mouse.get_pressed()[0]
+        # 【追加】ナナメ判定用のRect（ボタンの隙間を埋める）
+        s_n = self.size * 0.9 # ナナメボタンのサイズ
+        # 中心からの距離を微調整して、大きな円にフィットさせます
+        offset = self.size * 0.6
+        self.ur_rect = pygame.Rect(self.cx + 20, self.cy - 110, s_n, s_n) # 右上
+        self.ul_rect = pygame.Rect(self.cx - 90, self.cy - 110, s_n, s_n) # 左上
+        self.dr_rect = pygame.Rect(self.cx + 20, self.cy + 40,  s_n, s_n) # 右下
+        self.dl_rect = pygame.Rect(self.cx - 90, self.cy + 40,  s_n, s_n) # 左下
 
-        # 1. 土台と白いリング
+    def draw(self, screen):
+        pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
+        m_pos = pygame.mouse.get_pos()
+        m_pressed = pygame.mouse.get_pressed()[0] # 左クリック/タッチ
+
+        # 1. 土台と外側の白いリング
         pygame.draw.circle(pad_surf, (40, 40, 40, 150), (self.cx, self.cy), self.pad_radius)
         pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 3)
 
-        # 3. 各ボタンの描画（「感触」のために色を変える）
+        # 2. 全ての判定エリア（8方向）をリスト化
+        # (判定エリア, 表示する文字, 役割)
         buttons = [
-            (self.up_rect, "▲"), (self.down_rect, "▼"),
-            (self.left_rect, "◀"), (self.right_rect, "▶")
+            (self.up_rect, "▲", "U"), (self.down_rect, "▼", "D"),
+            (self.left_rect, "◀", "L"), (self.right_rect, "R"),
+            (self.ur_rect, "", "UR"), (self.ul_rect, "", "UL"),
+            (self.dr_rect, "", "DR"), (self.dl_rect, "", "DL")
         ]
 
-        for rect, arrow in buttons:
-            # ★感触：マウスが重なっていて、かつ押されているなら黄色
+        for rect, arrow, tag in buttons:
+            # マウスが重なっていて、かつ押されているなら光らせる
             if m_pressed and rect.collidepoint(m_pos):
-                color = (255, 255, 0, 200) 
+                color = (255, 255, 0, 180) # 押したときは黄色
             else:
-                color = (100, 100, 100, 180)
+                color = (80, 80, 80, 100) # 通常時は控えめなグレー
             
-            # ボタン本体を描画
-            pygame.draw.rect(pad_surf, color, rect, border_radius=10)
-            # ボタンの白い枠
-            pygame.draw.rect(pad_surf, (255, 255, 255, 200), rect, 2, border_radius=10)
-            
-            font = pygame.font.SysFont(None, 50)
-            # 矢印テキスト
-            txt = font.render(arrow, True, (255, 255, 255))
-            pad_surf.blit(txt, txt.get_rect(center=rect.center))
+            # ナナメのボタンは「枠線なし」にすると、十字キーが浮き立って綺麗に見えます
+            if len(tag) == 1: # 上下左右
+                pygame.draw.rect(pad_surf, color, rect, border_radius=10)
+                pygame.draw.rect(pad_surf, (255, 255, 255, 150), rect, 2, border_radius=10)
+            else: # ナナメ
+                # ナナメ部分は「角丸の塗りつぶし」だけで表現
+                pygame.draw.rect(pad_surf, color, rect, border_radius=20)
+
+            # 矢印テキスト（上下左右のみ）
+            if arrow != "":
+                font = pygame.font.SysFont(None, 50)
+                txt = font.render(arrow, True, (255, 255, 255))
+                pad_surf.blit(txt, txt.get_rect(center=rect.center))
 
         screen.blit(pad_surf, (0, 0))
 
-
     def get_input(self):
+        # ナナメ移動の判定ロジック
         mouse_pos = pygame.mouse.get_pos()
-        mouse_pressed = pygame.mouse.get_pressed()[0]
-        res = {"up": False, "down": False, "left": False, "right": False}
-        
-        if mouse_pressed:
-           mouse_pos = pygame.mouse.get_pos()
         mouse_pressed = pygame.mouse.get_pressed()[0]
         res = {"up": False, "down": False, "left": False, "right": False}
         
@@ -135,15 +140,16 @@ class Controller:
             dx = mouse_pos[0] - self.cx
             dy = mouse_pos[1] - self.cy
             
-            # パッドの範囲内を触っているか
             if dx**2 + dy**2 < self.pad_radius**2:
-                # 上下左右の判定（少し広めに判定するように調整）
-                if dy < -30: res["up"] = True
-                if dy > 30:  res["down"] = True
-                if dx < -30: res["left"] = True
-                if dx > 30:  res["right"] = True
+                # 判定をしきい値（30）で分けることで、ナナメ入力をスムーズに
+                # 判定の感度を調整（中心付近の「遊び」を少し広げる）
+                limit = 40 
+                if dy < -limit: res["up"] = True
+                if dy > limit:  res["down"] = True
+                if dx < -limit: res["left"] = True
+                if dx > limit:  res["right"] = True
         return res
-    
+
 async def play_game(screen):
     font_count = pygame.font.SysFont(None, 150)
     # --- 【追加】ゲーム用BGMの再生 ---
