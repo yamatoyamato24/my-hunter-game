@@ -72,35 +72,39 @@ class Controller:
     def __init__(self):
         # 十字キーの基準位置（画面下部の中央など、縦長画面に合わせて調整してください）
         # x, y は十字キーの中心付近
-        cx, cy = 400, 750  # 画面を縦長にしたとのことなので yを大きめに設定
-        size = 60         # ボタン1つのサイズ
+        self.cx, self.cy = 400, 800  # 画面を縦長にしたとのことなので yを大きめに設定
+        self.size = 70        # ボタン1つのサイズ
+        self.pad_radius = 160 #後ろの丸い土台の半径
 
-        # ケムコ風の十字配置 (Rectの作成)
-        self.up_rect    = pygame.Rect(cx - size//2, cy - size*1.5, size, size)
-        self.down_rect  = pygame.Rect(cx - size//2, cy + size//2,  size, size)
-        self.left_rect  = pygame.Rect(cx - size*1.5, cy - size//2, size, size)
-        self.right_rect = pygame.Rect(cx + size//2, cy - size//2,  size, size)
-        
-        # 中央部分（飾り、または決定ボタン用）
-        self.center_rect = pygame.Rect(cx - size//2, cy - size//2, size, size)
+        # 判定用のRect（ケムコ風十字配置）
+        self.up_rect    = pygame.Rect(self.cx - self.size//2, self.cy - self.size*1.6, self.size, self.size)
+        self.down_rect  = pygame.Rect(self.cx - self.size//2, self.cy + self.size*0.6, self.size, self.size)
+        self.left_rect  = pygame.Rect(self.cx - self.size*1.6, self.cy - self.size//2, self.size, self.size)
+        self.right_rect = pygame.Rect(self.cx + self.size*0.6, self.cy - self.size//2, self.size, self.size)
 
     def draw(self, screen):
-        # 十字キーの描画（レトロゲーム風に少し濃いめのグレー）
-        color = (100, 100, 100, 150) # 半透明のグレー
-        border = 3
+        # --- 半透明の仮想パッドを描画 ---
+        # 1. パッド専用の透明なシートを作る
+        pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
         
-        for r in [self.up_rect, self.down_rect, self.left_rect, self.right_rect, self.center_rect]:
-            # ボタンの背景
-            pygame.draw.rect(screen, color, r)
-            # ボタンの枠線（白）
-            pygame.draw.rect(screen, (255, 255, 255), r, border)
+        # 2. 後ろの丸い土台を描く (暗いグレーの半透明)
+        pygame.draw.circle(pad_surf, (50, 50, 50, 120), (self.cx, self.cy), self.pad_radius)
+        
+        # 3. 十字のボタンを描く (少し明るいグレーの半透明)
+        btn_color = (100, 100, 100, 180)
+        for r in [self.up_rect, self.down_rect, self.left_rect, self.right_rect]:
+            pygame.draw.rect(pad_surf, btn_color, r, border_radius=10)
+            pygame.draw.rect(pad_surf, (255, 255, 255, 200), r, 2, border_radius=10) # 枠線
 
-        # 矢印の記号を描画（簡易版）
-        font = pygame.font.SysFont(None, 40)
-        screen.blit(font.render("U", True, (255,255,255)), (self.up_rect.x+15, self.up_rect.y+10))
-        screen.blit(font.render("D", True, (255,255,255)), (self.down_rect.x+15, self.down_rect.y+10))
-        screen.blit(font.render("L", True, (255,255,255)), (self.left_rect.x+15, self.left_rect.y+10))
-        screen.blit(font.render("R", True, (255,255,255)), (self.right_rect.x+15, self.right_rect.y+10))
+        # 4. 矢印の文字を描画
+        font = pygame.font.SysFont(None, 50)
+        arrows = [("▲", self.up_rect), ("▼", self.down_rect), ("◀", self.left_rect), ("▶", self.right_rect)]
+        for text, rect in arrows:
+            txt_surf = font.render(text, True, (255, 255, 255, 220))
+            pad_surf.blit(txt_surf, txt_surf.get_rect(center=rect.center))
+
+        # 最後にメイン画面に合成
+        screen.blit(pad_surf, (0, 0))
 
     def get_input(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -109,16 +113,10 @@ class Controller:
         res = {"up": False, "down": False, "left": False, "right": False}
         
         if mouse_pressed:
-            # 座標の差（中心からどれくらい離れているか）で判定する
-            dx = mouse_pos[0] - 400 # cx 
-            dy = mouse_pos[1] - 750 # cy
-
-            # 中心からある程度の距離内を触っていたら
-            if dx**2 + dy**2 < 150**2: # 半径150px以内
-                if dy < -30: res["up"] = True    # 中心より30px以上上
-                if dy > 30:  res["down"] = True  # 中心より30px以上下
-                if dx < -30: res["left"] = True  # 中心より30px以上左
-                if dx > 30:  res["right"] = True # 中心より30px以上右
+            if self.up_rect.collidepoint(mouse_pos): res["up"] = True
+            if self.down_rect.collidepoint(mouse_pos): res["down"] = True
+            if self.left_rect.collidepoint(mouse_pos): res["left"] = True
+            if self.right_rect.collidepoint(mouse_pos): res["right"] = True
         return res
 
 async def play_game(screen):
@@ -129,8 +127,13 @@ async def play_game(screen):
     except Exception as e:
         print(f"BGM再生エラー: {e}")
 
-    bg, player, enemy, controller = Background(), Player(), Enemy(), Controller()
-    
+    # 背景を 800x1000 に拡大して準備
+    bg = Background()
+    bg.image = pygame.transform.scale(bg.image, (800, 1000))
+    bg.rect = bg.image.get_rect()
+
+    player, enemy, controller = Player(), Enemy(), Controller()
+
     # ① プレイヤーを小さく調整（クラス側の初期化でサイズ指定）
     player.image = load_game_image("assets/run_away.png", 60) # 幅60に
     player.rect = player.image.get_rect(center=(400, 300))
@@ -139,7 +142,7 @@ async def play_game(screen):
     clock, score = pygame.time.Clock(), 0
 
     # ② カウントダウン用の大きなフォントを用意
-    font_ui = pygame.font.SysFont(None, 36)
+    font_ui = pygame.font.SysFont(None, 40)
     font_count = pygame.font.SysFont(None, 150) # サイズ150！
 
     start_ticks = pygame.time.get_ticks()
@@ -180,6 +183,8 @@ async def play_game(screen):
         bg.draw(screen)
         player.draw(screen)
         enemy.draw(screen)
+
+        # 十字キーを「ゲーム画面の上」に重ねて描画
         controller.draw(screen)
         
         # UI表示
