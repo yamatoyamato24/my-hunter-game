@@ -82,30 +82,29 @@ class Controller:
         self.left_rect  = pygame.Rect(self.cx - self.size*1.6, self.cy - self.size//2, self.size, self.size)
         self.right_rect = pygame.Rect(self.cx + self.size*0.6, self.cy - self.size//2, self.size, self.size)
 
-    def draw(self, screen,current_input):
+    def draw(self, screen):
         # --- 半透明の仮想パッドを描画 ---
         # 1. パッド専用の透明なシートを作る
         pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
         
-        # 1. 土台の丸い背景 (少し暗め)
+        # マウスの状態をその場でチェック（感触のため）
+        m_pos = pygame.mouse.get_pos()
+        m_pressed = pygame.mouse.get_pressed()[0]
+
+        # 1. 土台と白いリング
         pygame.draw.circle(pad_surf, (40, 40, 40, 150), (self.cx, self.cy), self.pad_radius)
-        
-        # 2. 【改善】円形の白い外枠（リング）を描く
         pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 3)
 
         # 3. 各ボタンの描画（「感触」のために色を変える）
-        font = pygame.font.SysFont(None, 50)
         buttons = [
-            ("up", self.up_rect, "▲"),
-            ("down", self.down_rect, "▼"),
-            ("left", self.left_rect, "◀"),
-            ("right", self.right_rect, "▶")
+            (self.up_rect, "▲"), (self.down_rect, "▼"),
+            (self.left_rect, "◀"), (self.right_rect, "▶")
         ]
 
-        for direction, rect, arrow in buttons:
-            # ★感触のポイント：押されている方向なら「明るい黄色」、そうでなければ「グレー」
-            if current_input[direction]:
-                color = (255, 255, 0, 200) # 押したときは黄色く光る！
+        for rect, arrow in buttons:
+            # ★感触：マウスが重なっていて、かつ押されているなら黄色
+            if m_pressed and rect.collidepoint(m_pos):
+                color = (255, 255, 0, 200) 
             else:
                 color = (100, 100, 100, 180)
             
@@ -114,6 +113,7 @@ class Controller:
             # ボタンの白い枠
             pygame.draw.rect(pad_surf, (255, 255, 255, 200), rect, 2, border_radius=10)
             
+            font = pygame.font.SysFont(None, 50)
             # 矢印テキスト
             txt = font.render(arrow, True, (255, 255, 255))
             pad_surf.blit(txt, txt.get_rect(center=rect.center))
@@ -156,34 +156,20 @@ async def play_game(screen):
     bg = Background()
     bg.image = pygame.transform.scale(bg.image, (800, 1000))
     bg.rect = bg.image.get_rect()
-
     player, enemy, controller = Player(), Enemy(), Controller()
-
-    # ① プレイヤーを小さく調整（クラス側の初期化でサイズ指定）
-    player.image = load_game_image("assets/run_away.png", 60) # 幅60に
-    player.rect = player.image.get_rect(center=(400, 300))
-    player.mask = pygame.mask.from_surface(player.image)
-    
     clock, score = pygame.time.Clock(), 0
-
-    # ② カウントダウン用の大きなフォントを用意
     font_ui = pygame.font.SysFont(None, 40)
-    font_count = pygame.font.SysFont(None, 150) # サイズ150！
-
+    font_count = pygame.font.SysFont(None, 150) # ← この1行があるか確認してください！
     start_ticks = pygame.time.get_ticks()
 
     while True:
         # カウントダウン数秒の計算
-        seconds_passed = (pygame.time.get_ticks() - start_ticks) // 1000
-        countdown = 3 - seconds_passed
+        countdown = 3 - (pygame.time.get_ticks() - start_ticks) // 1000
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT: return "QUIT", 0
         
         ctrl = controller.get_input()
-
-        # 描画のところで ctrl を渡す
-        controller.draw(screen, ctrl) # ★ここを修正！
 
         # カウントダウン終了後のみ動かす
         if countdown <= 0:
