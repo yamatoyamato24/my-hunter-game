@@ -74,7 +74,7 @@ class Controller:
         # x, y は十字キーの中心付近
         self.cx, self.cy = 400, 800  # 画面を縦長にしたとのことなので yを大きめに設定
         self.size = 70        # ボタン1つのサイズ
-        self.pad_radius = 160 #後ろの丸い土台の半径
+        self.pad_radius = 140 #後ろの丸い土台の半径
 
         # 判定用のRect（ケムコ風十字配置）
         self.up_rect    = pygame.Rect(self.cx - self.size//2, self.cy - self.size*1.6, self.size, self.size)
@@ -82,29 +82,44 @@ class Controller:
         self.left_rect  = pygame.Rect(self.cx - self.size*1.6, self.cy - self.size//2, self.size, self.size)
         self.right_rect = pygame.Rect(self.cx + self.size*0.6, self.cy - self.size//2, self.size, self.size)
 
-    def draw(self, screen):
+    def draw(self, screen,current_input):
         # --- 半透明の仮想パッドを描画 ---
         # 1. パッド専用の透明なシートを作る
         pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
         
-        # 2. 後ろの丸い土台を描く (暗いグレーの半透明)
-        pygame.draw.circle(pad_surf, (50, 50, 50, 120), (self.cx, self.cy), self.pad_radius)
+        # 1. 土台の丸い背景 (少し暗め)
+        pygame.draw.circle(pad_surf, (40, 40, 40, 150), (self.cx, self.cy), self.pad_radius)
         
-        # 3. 十字のボタンを描く (少し明るいグレーの半透明)
-        btn_color = (100, 100, 100, 180)
-        for r in [self.up_rect, self.down_rect, self.left_rect, self.right_rect]:
-            pygame.draw.rect(pad_surf, btn_color, r, border_radius=10)
-            pygame.draw.rect(pad_surf, (255, 255, 255, 200), r, 2, border_radius=10) # 枠線
+        # 2. 【改善】円形の白い外枠（リング）を描く
+        pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 3)
 
-        # 4. 矢印の文字を描画
+        # 3. 各ボタンの描画（「感触」のために色を変える）
         font = pygame.font.SysFont(None, 50)
-        arrows = [("▲", self.up_rect), ("▼", self.down_rect), ("◀", self.left_rect), ("▶", self.right_rect)]
-        for text, rect in arrows:
-            txt_surf = font.render(text, True, (255, 255, 255, 220))
-            pad_surf.blit(txt_surf, txt_surf.get_rect(center=rect.center))
+        buttons = [
+            ("up", self.up_rect, "▲"),
+            ("down", self.down_rect, "▼"),
+            ("left", self.left_rect, "◀"),
+            ("right", self.right_rect, "▶")
+        ]
 
-        # 最後にメイン画面に合成
+        for direction, rect, arrow in buttons:
+            # ★感触のポイント：押されている方向なら「明るい黄色」、そうでなければ「グレー」
+            if current_input[direction]:
+                color = (255, 255, 0, 200) # 押したときは黄色く光る！
+            else:
+                color = (100, 100, 100, 180)
+            
+            # ボタン本体を描画
+            pygame.draw.rect(pad_surf, color, rect, border_radius=10)
+            # ボタンの白い枠
+            pygame.draw.rect(pad_surf, (255, 255, 255, 200), rect, 2, border_radius=10)
+            
+            # 矢印テキスト
+            txt = font.render(arrow, True, (255, 255, 255))
+            pad_surf.blit(txt, txt.get_rect(center=rect.center))
+
         screen.blit(pad_surf, (0, 0))
+
 
     def get_input(self):
         mouse_pos = pygame.mouse.get_pos()
@@ -112,30 +127,23 @@ class Controller:
         res = {"up": False, "down": False, "left": False, "right": False}
         
         if mouse_pressed:
-            # 1. 十字ボタンそのものを触った時（今のまま）
-            if self.up_rect.collidepoint(mouse_pos):    res["up"] = True
-            if self.down_rect.collidepoint(mouse_pos):  res["down"] = True
-            if self.left_rect.collidepoint(mouse_pos):  res["left"] = True
-            if self.right_rect.collidepoint(mouse_pos): res["right"] = True
-            
-            # 2. 【追加】ボタンの「間」を触った時にナナメ判定にする
-            # 中心からの距離(dx, dy)で判定
+           mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+        res = {"up": False, "down": False, "left": False, "right": False}
+        
+        if mouse_pressed:
             dx = mouse_pos[0] - self.cx
             dy = mouse_pos[1] - self.cy
             
-            # パッドの円形範囲内(半径160以内)を触っている時
+            # パッドの範囲内を触っているか
             if dx**2 + dy**2 < self.pad_radius**2:
-                # 右上エリア
-                if dx > 20 and dy < -20: res["right"] = True; res["up"] = True
-                # 左上エリア
-                if dx < -20 and dy < -20: res["left"] = True; res["up"] = True
-                # 右下エリア
-                if dx > 20 and dy > 20: res["right"] = True; res["down"] = True
-                # 左下エリア
-                if dx < -20 and dy > 20: res["left"] = True; res["down"] = True
-                
+                # 上下左右の判定（少し広めに判定するように調整）
+                if dy < -30: res["up"] = True
+                if dy > 30:  res["down"] = True
+                if dx < -30: res["left"] = True
+                if dx > 30:  res["right"] = True
         return res
-
+    
 async def play_game(screen):
     # --- 【追加】ゲーム用BGMの再生 ---
     try:
@@ -173,6 +181,9 @@ async def play_game(screen):
             if event.type == pygame.QUIT: return "QUIT", 0
         
         ctrl = controller.get_input()
+
+        # 描画のところで ctrl を渡す
+        controller.draw(screen, ctrl) # ★ここを修正！
 
         # カウントダウン終了後のみ動かす
         if countdown <= 0:
