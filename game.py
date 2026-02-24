@@ -31,7 +31,7 @@ class Player:
         if keys[pygame.K_DOWN]:  self.rect.y += self.speed
         if keys[pygame.K_LEFT]:  self.rect.x -= self.speed
         if keys[pygame.K_RIGHT]: self.rect.x += self.speed
-        self.rect.clamp_ip(pygame.Rect(0, 0, 800, 600))
+        self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1000))
         if self.invincible_timer > 0: self.invincible_timer -= 1
 
     def draw(self, screen):
@@ -108,15 +108,32 @@ class Controller:
 
     def get_input(self):
         mouse_pos = pygame.mouse.get_pos()
-        mouse_pressed = pygame.mouse.get_pressed()[0] # 左クリック（タッチ）
-        
+        mouse_pressed = pygame.mouse.get_pressed()[0]
         res = {"up": False, "down": False, "left": False, "right": False}
         
         if mouse_pressed:
-            if self.up_rect.collidepoint(mouse_pos): res["up"] = True
-            if self.down_rect.collidepoint(mouse_pos): res["down"] = True
-            if self.left_rect.collidepoint(mouse_pos): res["left"] = True
+            # 1. 十字ボタンそのものを触った時（今のまま）
+            if self.up_rect.collidepoint(mouse_pos):    res["up"] = True
+            if self.down_rect.collidepoint(mouse_pos):  res["down"] = True
+            if self.left_rect.collidepoint(mouse_pos):  res["left"] = True
             if self.right_rect.collidepoint(mouse_pos): res["right"] = True
+            
+            # 2. 【追加】ボタンの「間」を触った時にナナメ判定にする
+            # 中心からの距離(dx, dy)で判定
+            dx = mouse_pos[0] - self.cx
+            dy = mouse_pos[1] - self.cy
+            
+            # パッドの円形範囲内(半径160以内)を触っている時
+            if dx**2 + dy**2 < self.pad_radius**2:
+                # 右上エリア
+                if dx > 20 and dy < -20: res["right"] = True; res["up"] = True
+                # 左上エリア
+                if dx < -20 and dy < -20: res["left"] = True; res["up"] = True
+                # 右下エリア
+                if dx > 20 and dy > 20: res["right"] = True; res["down"] = True
+                # 左下エリア
+                if dx < -20 and dy > 20: res["left"] = True; res["down"] = True
+                
         return res
 
 async def play_game(screen):
