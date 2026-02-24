@@ -122,6 +122,13 @@ class Controller:
         return res
 
 async def play_game(screen):
+    # --- 【追加】ゲーム用BGMの再生 ---
+    try:
+        pygame.mixer.music.load("assets/game_bgm.ogg")
+        pygame.mixer.music.play(-1)  # 無限ループ
+    except Exception as e:
+        print(f"BGM再生エラー: {e}")
+
     bg, player, enemy, controller = Background(), Player(), Enemy(), Controller()
     
     # ① プレイヤーを小さく調整（クラス側の初期化でサイズ指定）
@@ -164,8 +171,9 @@ async def play_game(screen):
 
             # HPがなくなったら GAMEOVER という言葉を main.py に返す
             if player.hp <= 0:
+                pygame.mixer.music.stop() # ★ゲームのBGMをここで一度止める！
                 #ゲームオーバー画面へ切り替え
-                await asyncio.sleep(0.3) #少し余韻を残す
+                await asyncio.sleep(0.5) #少し余韻を残す
                 return "GAMEOVER", int(score)
 
         # --- 描画処理 ---
