@@ -145,6 +145,7 @@ class Controller:
         return res
     
 async def play_game(screen):
+    font_count = pygame.font.SysFont(None, 150)
     # --- 【追加】ゲーム用BGMの再生 ---
     try:
         pygame.mixer.music.load("assets/game_bgm.ogg")
