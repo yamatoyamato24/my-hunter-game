@@ -32,7 +32,7 @@ async def show_title(screen):
         # メインタイトル点滅表示
         if alpha > 0.3:
             txt_main = font_main.render("スペースキーでスタート", True, (255, 255, 255))
-            screen.blit(txt_main, txt_main.get_rect(center=(400, 300)))
+            screen.blit(txt_main, txt_main.get_rect(center=(400, 500)))
         
         # イベント処理
         for event in pygame.event.get():
