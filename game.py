@@ -30,7 +30,7 @@ class Player:
         if keys[pygame.K_LEFT]:  self.rect.x -= self.speed
         if keys[pygame.K_RIGHT]: self.rect.x += self.speed
         # 画面の下端(1000)まで動けるように修正
-        self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1000))
+        self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1500))
         if self.invincible_timer > 0: self.invincible_timer -= 1
 
     def draw(self, screen):
@@ -57,10 +57,10 @@ class Background:
     def __init__(self):
         try:
             self.image = pygame.image.load("assets/background.png").convert()
-            # 縦長画面(800x1000)に合わせて拡大
-            self.image = pygame.transform.scale(self.image, (800, 1000))
+            # 縦長画面(800x1500)に合わせて拡大
+            self.image = pygame.transform.scale(self.image, (800, 1500))
         except:
-            self.image = pygame.Surface((800, 1000))
+            self.image = pygame.Surface((800, 1500))
             self.image.fill((34, 139, 34))
         self.rect = self.image.get_rect()
 
@@ -69,9 +69,10 @@ class Background:
 
 class Controller:
     def __init__(self):
-        self.cx, self.cy = 400, 800 
-        self.size = 90
-        self.pad_radius = 180 
+        # 画面の下の方（y=1200あたり）に配置
+        self.cx, self.cy = 400, 1200
+        self.size = 110 # さらに大きく（押しやすさ重視）
+        self.pad_radius = 220  #土台も大きく
         
         # 十字ボタン（上下左右）
         self.up_rect    = pygame.Rect(self.cx - self.size//2, self.cy - self.size*1.7, self.size, self.size)
@@ -81,17 +82,17 @@ class Controller:
 
         # 【追加】ナナメ判定用のRect（大きな円に合わせて位置を調整）
         s_n = self.size * 0.9 
-        offset = 110 # 中心からの距離
+        offset = 130 # 中心からの距離
         self.ur_rect = pygame.Rect(self.cx + 20, self.cy - offset, s_n, s_n) # 右上
-        self.ul_rect = pygame.Rect(self.cx - 110, self.cy - offset, s_n, s_n) # 左上
-        self.dr_rect = pygame.Rect(self.cx + 20, self.cy + 20,  s_n, s_n) # 右下
-        self.dl_rect = pygame.Rect(self.cx - 110, self.cy + 20,  s_n, s_n) # 左下
+        self.ul_rect = pygame.Rect(self.cx - 130, self.cy - offset, s_n, s_n) # 左上
+        self.dr_rect = pygame.Rect(self.cx + 20, self.cy + 30,  s_n, s_n) # 右下
+        self.dl_rect = pygame.Rect(self.cx - 130, self.cy + 30,  s_n, s_n) # 左下
 
         # ★フォントの準備はここ（最初の一回だけ）で行う！
-        self.font = pygame.font.SysFont(None, 60)
+        self.font = pygame.font.SysFont(None, 70)
 
     def draw(self, screen):
-        pad_surf = pygame.Surface((800, 1000), pygame.SRCALPHA)
+        pad_surf = pygame.Surface((800, 1500), pygame.SRCALPHA)
         m_pos = pygame.mouse.get_pos()
         m_pressed = pygame.mouse.get_pressed()[0]
 
@@ -135,7 +136,7 @@ class Controller:
             dy = mouse_pos[1] - self.cy
             
             if dx**2 + dy**2 < self.pad_radius**2:
-                limit = 40 
+                limit = 10 
                 if dy < -limit: res["up"] = True
                 if dy > limit:  res["down"] = True
                 if dx < -limit: res["left"] = True
@@ -155,7 +156,7 @@ async def play_game(screen):
     # クラスの初期化
     bg = Background()
     # 背景を画面サイズに合わせる
-    bg.image = pygame.transform.scale(bg.image, (800, 1000))
+    bg.image = pygame.transform.scale(bg.image, (800, 1500))
     bg.rect = bg.image.get_rect()
     
     player = Player()
@@ -216,8 +217,8 @@ async def play_game(screen):
 
         # カウントダウン演出（画面を暗く＋大きな数字）
         if countdown > 0:
-            # 1000pxの画面全体を覆うように修正
-            overlay = pygame.Surface((800, 1000), pygame.SRCALPHA)
+            # 1500pxの画面全体を覆うように修正
+            overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             screen.blit(overlay, (0, 0))
 
