@@ -1,5 +1,6 @@
 import pygame
 import asyncio
+import math
 
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
@@ -29,7 +30,7 @@ class Player:
         if keys[pygame.K_DOWN]:  self.rect.y += self.speed
         if keys[pygame.K_LEFT]:  self.rect.x -= self.speed
         if keys[pygame.K_RIGHT]: self.rect.x += self.speed
-        # 画面の下端(1000)まで動けるように修正
+        # 画面の下端(1500)まで動けるように修正
         self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1500))
         if self.invincible_timer > 0: self.invincible_timer -= 1
 
@@ -70,58 +71,60 @@ class Background:
 class Controller:
     def __init__(self):
         # 画面の下の方（y=1200あたり）に配置
-        self.cx, self.cy = 400, 1200
-        self.size = 110 # さらに大きく（押しやすさ重視）
-        self.pad_radius = 220  #土台も大きく
-        
-        # 十字ボタン（上下左右）
-        self.up_rect    = pygame.Rect(self.cx - self.size//2, self.cy - self.size*1.7, self.size, self.size)
-        self.down_rect  = pygame.Rect(self.cx - self.size//2, self.cy + self.size*0.7, self.size, self.size)
-        self.left_rect  = pygame.Rect(self.cx - self.size*1.7, self.cy - self.size//2, self.size, self.size)
-        self.right_rect = pygame.Rect(self.cx + self.size*0.7, self.cy - self.size//2, self.size, self.size)
-
-        # 【追加】ナナメ判定用のRect（大きな円に合わせて位置を調整）
-        s_n = self.size * 0.9 
-        offset = 130 # 中心からの距離
-        self.ur_rect = pygame.Rect(self.cx + 20, self.cy - offset, s_n, s_n) # 右上
-        self.ul_rect = pygame.Rect(self.cx - 130, self.cy - offset, s_n, s_n) # 左上
-        self.dr_rect = pygame.Rect(self.cx + 20, self.cy + 30,  s_n, s_n) # 右下
-        self.dl_rect = pygame.Rect(self.cx - 130, self.cy + 30,  s_n, s_n) # 左下
-
-        # ★フォントの準備はここ（最初の一回だけ）で行う！
+        self.cx, self.cy = 400, 1200 
+        self.pad_radius = 220 
         self.font = pygame.font.SysFont(None, 70)
 
     def draw(self, screen):
+        # 1500の画面全体を覆うSurface
         pad_surf = pygame.Surface((800, 1500), pygame.SRCALPHA)
         m_pos = pygame.mouse.get_pos()
-        m_pressed = pygame.mouse.get_pressed()[0]
+        m_pressed = pygame.mouse.get_pressed()[0] # 左クリック/タッチ
 
-        # 1. 土台と外側の白いリング
+        # 1. 土台の丸（暗いグレー）
         pygame.draw.circle(pad_surf, (40, 40, 40, 150), (self.cx, self.cy), self.pad_radius)
-        pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 4)
 
-        buttons = [
-            (self.up_rect, "▲", "U"), (self.down_rect, "▼", "D"),
-            (self.left_rect, "◀", "L"), (self.right_rect, "▶", "R"),
-            (self.ur_rect, "", "UR"), (self.ul_rect, "", "UL"),
-            (self.dr_rect, "", "DR"), (self.dl_rect, "", "DL")
-        ]
-
-        for rect, arrow, tag in buttons:
-            if m_pressed and rect.collidepoint(m_pos):
-                color = (255, 255, 0, 180)
-            else:
-                color = (80, 80, 80, 100)
+        # 2. 扇状の「光」の描画
+        if m_pressed:
+            dx = m_pos[0] - self.cx
+            dy = m_pos[1] - self.cy
+            dist_sq = dx**2 + dy**2
             
-            if len(tag) == 1:
-                pygame.draw.rect(pad_surf, color, rect, border_radius=15)
-                pygame.draw.rect(pad_surf, (255, 255, 255, 150), rect, 2, border_radius=15)
-            else:
-                pygame.draw.rect(pad_surf, color, rect, border_radius=30)
+            # 半径の範囲内なら、触っている角度を計算
+            if 10**2 < dist_sq < self.pad_radius**2:
+                import math
+                # 角度（ラジアン）を取得 (-π to π)
+                angle = math.atan2(dy, dx)
+                
+                # 触っている方向を扇状に光らせる (黄色)
+                # 45度(π/4)ずつの範囲で描画
+                start_angle = (math.floor((angle + math.pi/8) / (math.pi/4)) * (math.pi/4)) - math.pi/8
+                points = [
+                    (self.cx, self.cy),
+                    (self.cx + math.cos(start_angle) * self.pad_radius, self.cy + math.sin(start_angle) * self.pad_radius),
+                    (self.cx + math.cos(start_angle + math.pi/4) * self.pad_radius, self.cy + math.sin(start_angle + math.pi/4) * self.pad_radius)
+                ]
+                pygame.draw.polygon(pad_surf, (255, 255, 0, 150), points)
 
-            if arrow != "":
-                txt = self.font.render(arrow, True, (255, 255, 255))
-                pad_surf.blit(txt, txt.get_rect(center=rect.center))
+        # 3. 扇状の「白い枠線」を描く
+        import math
+        for i in range(8):
+            angle = i * (math.pi / 4) + math.pi/8
+            # 中心から外側へ引く境界線
+            end_x = self.cx + math.cos(angle) * self.pad_radius
+            end_y = self.cy + math.sin(angle) * self.pad_radius
+            pygame.draw.line(pad_surf, (255, 255, 255, 100), (self.cx, self.cy), (end_x, end_y), 2)
+
+        # 4. 外枠のリング
+        pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 5)
+        # 中心に小さな円（飾り）
+        pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), 10)
+
+        # 5. 矢印のガイド表示
+        arrows = [("▲", 0, -150), ("▼", 0, 150), ("◀", -150, 0), ("▶", 150, 0)]
+        for arrow, ox, oy in arrows:
+            txt = self.font.render(arrow, True, (255, 255, 255, 180))
+            pad_surf.blit(txt, txt.get_rect(center=(self.cx + ox, self.cy + oy)))
 
         screen.blit(pad_surf, (0, 0))
 
@@ -136,7 +139,7 @@ class Controller:
             dy = mouse_pos[1] - self.cy
             
             if dx**2 + dy**2 < self.pad_radius**2:
-                limit = 10 
+                limit = 5
                 if dy < -limit: res["up"] = True
                 if dy > limit:  res["down"] = True
                 if dx < -limit: res["left"] = True
