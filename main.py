@@ -6,7 +6,7 @@ import gameover
 
 async def main():
     pygame.init()
-    screen = pygame.display.set_mode((800, 1000))
+    screen = pygame.display.set_mode((800, 1500))
     pygame.display.set_caption("My HUNTER Game")
 
     state = "TITLE"
