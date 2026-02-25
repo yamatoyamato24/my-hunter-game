@@ -20,7 +20,7 @@ class Player:
         self.image = load_game_image("assets/run_away.png", 60)
         self.rect = self.image.get_rect(center=(400, 300))
         self.mask = pygame.mask.from_surface(self.image)
-        self.speed = 5
+        self.speed = 10
         self.hp = 3
         self.invincible_timer = 0 
 
@@ -35,7 +35,21 @@ class Player:
         if self.invincible_timer > 0: self.invincible_timer -= 1
 
     def draw(self, screen):
-        if self.invincible_timer % 10 < 5: 
+        # 無敵時間中（ダメージを受けた後）の演出
+        if self.invincible_timer > 0:
+            # 10フレームごとに点滅（チカチカさせる）
+            if self.invincible_timer % 10 < 5: 
+                # 1. 画像のコピーを作る（元の画像を変えないため）
+                temp_image = self.image.copy()
+                
+                # 2. 赤色で塗りつぶして合成する
+                # (255, 100, 100) は少し明るい赤。真っ赤なら (255, 0, 0)
+                temp_image.fill((255, 150, 150), special_flags=pygame.BLEND_RGBA_MULT)
+                
+                # 3. 赤くなった画像を表示
+                screen.blit(temp_image, self.rect)
+        else:
+            # 通常時はそのまま表示
             screen.blit(self.image, self.rect)
 
 class Enemy:
@@ -43,7 +57,7 @@ class Enemy:
         self.image = load_game_image("assets/enemy.png", 300)
         self.rect = self.image.get_rect(topleft=(20, 20))
         self.mask = pygame.mask.from_surface(self.image)
-        self.speed = 2
+        self.speed = 5
 
     def update(self, player_rect):
         if self.rect.x < player_rect.x: self.rect.x += self.speed
@@ -168,6 +182,9 @@ async def play_game(screen):
     
     clock = pygame.time.Clock()
     score = 0
+    font_msg = pygame.font.SysFont(None, 80) # メッセージ用の大きなフォント
+    speed_up_timer = 0 # メッセージを表示する残り時間
+    last_speed_check = 0 # 最後にスピードを上げた秒数
     font_ui = pygame.font.SysFont(None, 40)
     font_count = pygame.font.SysFont(None, 150)
     
@@ -192,7 +209,19 @@ async def play_game(screen):
             
             player.update()
             enemy.update(player.rect)
-            score += 1 / 60 
+            # スコア（秒数）の更新
+            score += 1 / 60
+            current_sec = int(score)
+
+            # ★【10秒ごとにスピードアップ】
+            if current_sec > 0 and current_sec % 10 == 0 and current_sec != last_speed_check:
+                enemy.speed += 1         # 敵を速くする
+                speed_up_timer = 90      # メッセージを1.5秒間(90フレーム)出す
+                last_speed_check = current_sec # 重複防止
+
+            # ★【改造案】スコア（秒数）に合わせて敵をどんどん速くする
+            # 例：10秒ごとにスピードが 1 上がる
+            enemy.speed = 5 + (int(score) // 10)
 
         # 当たり判定（正確なマスク衝突）
         offset_x = enemy.rect.x - player.rect.x
@@ -214,6 +243,24 @@ async def play_game(screen):
         # 十字キーを一番上に描画
         controller.draw(screen)
         
+        # ★【スピードアップ演出の描画】
+        if speed_up_timer > 0:
+            # 1. 灰色の背景帯（横いっぱいに広がる帯）
+            # (x, y, width, height)
+            msg_bg_rect = pygame.Rect(0, 450, 800, 100) 
+            # 半透明の灰色を描くためのSurface
+            msg_surf = pygame.Surface((800, 100), pygame.SRCALPHA)
+            msg_surf.fill((50, 50, 50, 180)) # 濃い灰色の半透明
+            screen.blit(msg_surf, (0, 450))
+
+            # 2. 「スピードアップ！」の文字
+            # 日本語フォントを使っている場合は title.py と同じように Font を使ってください
+            txt = font_msg.render("SPEED UP!!", True, (255, 255, 0)) # 黄色
+            txt_rect = txt.get_rect(center=(400, 500))
+            screen.blit(txt, txt_rect)
+
+            speed_up_timer -= 1 # タイマーを減らす
+
         # UI表示
         txt_ui = font_ui.render(f"LIFE:{player.hp} SCORE:{int(score)}", True, (255,255,255))
         screen.blit(txt_ui, (20,20))
