@@ -24,15 +24,27 @@ class Player:
         self.hp = 3
         self.invincible_timer = 0 
 
-    def update(self):
+    def update(self, move_vec=(0, 0)):
+        # キーボード操作
         keys = pygame.key.get_pressed()
         if keys[pygame.K_UP]:    self.rect.y -= self.speed
         if keys[pygame.K_DOWN]:  self.rect.y += self.speed
         if keys[pygame.K_LEFT]:  self.rect.x -= self.speed
         if keys[pygame.K_RIGHT]: self.rect.x += self.speed
+
+        # タッチ操作（引数で移動ベクトルを受け取る）
+        self.rect.x += move_vec[0] * self.speed
+        self.rect.y += move_vec[1] * self.speed
+
         # 画面の下端(1500)まで動けるように修正
         self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1500))
-        if self.invincible_timer > 0: self.invincible_timer -= 1
+
+        if self.invincible_timer > 0: 
+            self.invincible_timer -= 1
+
+        
+
+        self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1500))
 
     def draw(self, screen):
         # 無敵時間中（ダメージを受けた後）の演出
@@ -83,6 +95,20 @@ class Background:
         screen.blit(self.image, self.rect)
 
 class Controller:
+    def get_move_vector(self):
+        m_pos = pygame.mouse.get_pos()
+        m_pressed = pygame.mouse.get_pressed()[0]
+        if not m_pressed: return (0, 0)
+
+        dx = m_pos[0] - self.cx
+        dy = m_pos[1] - self.cy
+        dist = math.sqrt(dx**2 + dy**2)
+
+        # パッドの範囲内なら、正規化（1か-1など）した方向を返す
+        if 10 < dist < self.pad_radius:
+            return (dx/dist, dy/dist) # 斜め移動もスムーズになります
+        return (0, 0)
+
     def __init__(self):
         # 画面の下の方（y=1200あたり）に配置
         self.cx, self.cy = 400, 1200 
@@ -159,39 +185,46 @@ class Controller:
                 if dx < -limit: res["left"] = True
                 if dx > limit:  res["right"] = True
         return res
+
 async def play_game(screen):
     # ★開始直後に一瞬だけ休ませる（ブラウザの読み込み待ち）
     await asyncio.sleep(0.1) 
+
+    # --- フォント読み込み（ここで1回だけ行う） ---
+    try:
+        font_path = "assets/NotoSansJP-Regular.ttf"
+        font_msg = pygame.font.Font(font_path, 80)   
+        font_ui = pygame.font.Font(font_path, 40)    
+        font_count = pygame.font.Font(font_path, 150) 
+    except:
+        font_msg = pygame.font.SysFont(None, 80)
+        font_ui = pygame.font.SysFont(None, 40)
+        font_count = pygame.font.SysFont(None, 150)
 
     # --- ゲーム用BGMの再生 ---
     try:
         pygame.mixer.music.load("assets/game_bgm.ogg")
         pygame.mixer.music.play(-1)
     except:
-        print("BGM再生エラー")
+        pass
 
     # クラスの初期化
     bg = Background()
-    # 背景を画面サイズに合わせる
-    bg.image = pygame.transform.scale(bg.image, (800, 1500))
-    bg.rect = bg.image.get_rect()
-    
     player = Player()
     enemy = Enemy()
     controller = Controller()
     
     clock = pygame.time.Clock()
     score = 0
-    font_msg = pygame.font.SysFont(None, 80) # メッセージ用の大きなフォント
-    speed_up_timer = 0 # メッセージを表示する残り時間
-    last_speed_check = 0 # 最後にスピードを上げた秒数
-    font_ui = pygame.font.SysFont(None, 40)
-    font_count = pygame.font.SysFont(None, 150)
+    speed_up_timer = 0 
+    last_speed_check = 0 
+    
+    # 【修正ポイント】ここにあった SysFont(None, ...) の再定義を削除しました
+    # これで上の日本語フォントがそのまま使われます
     
     start_ticks = pygame.time.get_ticks()
 
     while True:
-        # カウントダウン秒数の計算
         countdown = 3 - (pygame.time.get_ticks() - start_ticks) // 1000
 
         for event in pygame.event.get():
@@ -200,8 +233,8 @@ async def play_game(screen):
         # 入力を受け取る
         ctrl = controller.get_input()
 
-        # カウントダウン終了後のみ更新
         if countdown <= 0:
+            # 十字キー/タップ操作の反映
             if ctrl["up"]:    player.rect.y -= player.speed
             if ctrl["down"]:  player.rect.y += player.speed
             if ctrl["left"]:  player.rect.x -= player.speed
@@ -209,72 +242,63 @@ async def play_game(screen):
             
             player.update()
             enemy.update(player.rect)
-            # スコア（秒数）の更新
+            
             score += 1 / 60
             current_sec = int(score)
 
-            # ★【10秒ごとにスピードアップ】
+            # ★【追加】25秒でゲームクリア判定
+            if current_sec >= 25:
+                pygame.mixer.music.stop() # 音楽を止める
+                await asyncio.sleep(0.5)  # クリアの余韻
+                return "ゲームクリア", current_sec # "CLEAR" という状態を返す
+
+            # スピードアップ処理
             if current_sec > 0 and current_sec % 10 == 0 and current_sec != last_speed_check:
-                enemy.speed += 1         # 敵を速くする
-                speed_up_timer = 90      # メッセージを1.5秒間(90フレーム)出す
-                last_speed_check = current_sec # 重複防止
+                speed_up_timer = 90      
+                last_speed_check = current_sec 
 
-            # ★【改造案】スコア（秒数）に合わせて敵をどんどん速くする
-            # 例：10秒ごとにスピードが 1 上がる
-            enemy.speed = 5 + (int(score) // 10)
+            # スコアに合わせて敵の速度を更新
+            enemy.speed = 5 + (current_sec // 10)
 
-        # 当たり判定（正確なマスク衝突）
+        # 当たり判定
         offset_x = enemy.rect.x - player.rect.x
         offset_y = enemy.rect.y - player.rect.y
         if player.mask.overlap(enemy.mask, (offset_x, offset_y)) and player.invincible_timer <= 0:
             player.hp -= 1
             player.invincible_timer = 60
-
             if player.hp <= 0:
-                pygame.mixer.music.stop() # 音楽を止める
-                await asyncio.sleep(0.5)  # 余韻
+                pygame.mixer.music.stop()
+                await asyncio.sleep(0.5)
                 return "GAMEOVER", int(score)
 
         # --- 描画処理 ---
         bg.draw(screen)
         player.draw(screen)
         enemy.draw(screen)
-
-        # 十字キーを一番上に描画
         controller.draw(screen)
-        
-        # ★【スピードアップ演出の描画】
+
+        # スピードアップ演出
         if speed_up_timer > 0:
-            # 1. 灰色の背景帯（横いっぱいに広がる帯）
-            # (x, y, width, height)
-            msg_bg_rect = pygame.Rect(0, 450, 800, 100) 
-            # 半透明の灰色を描くためのSurface
             msg_surf = pygame.Surface((800, 100), pygame.SRCALPHA)
-            msg_surf.fill((50, 50, 50, 180)) # 濃い灰色の半透明
+            msg_surf.fill((50, 50, 50, 180)) 
             screen.blit(msg_surf, (0, 450))
-
-            # 2. 「スピードアップ！」の文字
-            # 日本語フォントを使っている場合は title.py と同じように Font を使ってください
-            txt = font_msg.render("SPEED UP!!", True, (255, 255, 0)) # 黄色
-            txt_rect = txt.get_rect(center=(400, 500))
-            screen.blit(txt, txt_rect)
-
-            speed_up_timer -= 1 # タイマーを減らす
+            
+            # 日本語フォントで描画
+            txt = font_msg.render("スピードアップ！！", True, (255, 255, 0)) 
+            screen.blit(txt, txt.get_rect(center=(400, 500)))
+            speed_up_timer -= 1 
 
         # UI表示
-        txt_ui = font_ui.render(f"LIFE:{player.hp} SCORE:{int(score)}", True, (255,255,255))
+        txt_ui = font_ui.render(f"体力:{player.hp}  スコア:{int(score)}秒", True, (255,255,255))
         screen.blit(txt_ui, (20,20))
 
-        # カウントダウン演出（画面を暗く＋大きな数字）
+        # カウントダウン演出
         if countdown > 0:
-            # 1500pxの画面全体を覆うように修正
             overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 150))
             screen.blit(overlay, (0, 0))
-
             count_surf = font_count.render(str(countdown), True, (255, 215, 0))
-            count_rect = count_surf.get_rect(center=(400, 500)) # 1000の真ん中(500)に
-            screen.blit(count_surf, count_rect)
+            screen.blit(count_surf, count_surf.get_rect(center=(400, 500)))
 
         pygame.display.flip()
         clock.tick(60)
