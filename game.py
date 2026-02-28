@@ -170,6 +170,7 @@ class Controller:
 
     def get_input(self):
         mouse_pos = pygame.mouse.get_pos()
+        # [0]を付けて左クリック/タップのみ判定
         mouse_pressed = pygame.mouse.get_pressed()[0]
         res = {"up": False, "down": False, "left": False, "right": False}
         
@@ -180,32 +181,43 @@ class Controller:
             dist_sq = dx**2 + dy**2
 
             # 遊び（中心の無反応地帯）を作って誤操作防止
+            # パッドの円内に指があるか判定
             if 10**2 < dist_sq < self.pad_radius**2:
-                # 扇状の光と同じ「角度(ラジアン)」で判定
-                angle = math.atan2(dy, dx)
-
-                # 角度を「度(-180〜180)」に変換して全8方向を判定
-                deg = math.degrees(angle)
+                # 角度（度数法）に変換
+                import math
+                deg = math.degrees(math.atan2(dy, dx))
                 
-                # 上方向（-90度付近）
-                if -112.5 < deg <= -67.5:
-                    res["up"] = True
-                # 下方向（90度付近）
+                # --- 45度ずつの範囲で8方向を判定 ---
+                
+                # 右 ( -22.5 〜 22.5 )
+                if -22.5 < deg <= 22.5:
+                    res["right"] = True
+                # 右下 ( 22.5 〜 67.5 )
+                elif 22.5 < deg <= 67.5:
+                    res["right"] = True
+                    res["down"] = True
+                # 下 ( 67.5 〜 112.5 )
                 elif 67.5 < deg <= 112.5:
                     res["down"] = True
-                # 左方向（180度付近）
+                # 左下 ( 112.5 〜 157.5 )
+                elif 112.5 < deg <= 157.5:
+                    res["left"] = True
+                    res["down"] = True
+                # 左 ( 157.5以上 または -157.5以下 )
                 elif deg > 157.5 or deg <= -157.5:
                     res["left"] = True
-                # 右方向（0度付近）
-                elif -22.5 < deg <= 22.5:
-                    res["right"] = True
-                
-                # 斜め入力（必要なら追加できます）
-                # 例：右上
-                elif -67.5 < deg <= -22.5:
+                # 左上 ( -157.5 〜 -112.5 )
+                elif -157.5 < deg <= -112.5:
+                    res["left"] = True
                     res["up"] = True
+                # 上 ( -112.5 〜 -67.5 )
+                elif -112.5 < deg <= -67.5:
+                    res["up"] = True
+                # 右上 ( -67.5 〜 -22.5 )
+                elif -67.5 < deg <= -22.5:
                     res["right"] = True
-                # 同様に他の斜めも設定可能
+                    res["up"] = True
+
         return res
 
 async def play_game(screen):
