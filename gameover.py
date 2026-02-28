@@ -33,6 +33,8 @@ async def show_gameover(screen, score, is_clear=False):
 
         # --- # 2. 文字を描画（ここを修正！） ---
         if is_clear:
+            # 絵文字表示のために、一時的にシステムフォントを使用
+            font_emoji = pygame.font.SysFont(None, 60)
             # クリア時の表示（金色）
             text_title = font_main.render("🎉 ゲームクリア！ 🎉", True, (255, 215, 0))
         else:
