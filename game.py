@@ -247,10 +247,10 @@ async def play_game(screen):
             current_sec = int(score)
 
             # ★【追加】25秒でゲームクリア判定
-            if current_sec >= 25:
+            if current_sec >= 20:
                 pygame.mixer.music.stop() # 音楽を止める
                 await asyncio.sleep(0.5)  # クリアの余韻
-                return "ゲームクリア", current_sec # "CLEAR" という状態を返す
+                return "CLEAR", current_sec # "CLEAR" という状態を返す
 
             # スピードアップ処理
             if current_sec > 0 and current_sec % 10 == 0 and current_sec != last_speed_check:
