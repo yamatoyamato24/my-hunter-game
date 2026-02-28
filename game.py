@@ -177,13 +177,35 @@ class Controller:
             # 配列のインデックス指定で計算（エラー防止）
             dx = mouse_pos[0] - self.cx
             dy = mouse_pos[1] - self.cy
-            
-            if dx**2 + dy**2 < self.pad_radius**2:
-                limit = 5
-                if dy < -limit: res["up"] = True
-                if dy > limit:  res["down"] = True
-                if dx < -limit: res["left"] = True
-                if dx > limit:  res["right"] = True
+            dist_sq = dx**2 + dy**2
+
+            # 遊び（中心の無反応地帯）を作って誤操作防止
+            if 10**2 < dist_sq < self.pad_radius**2:
+                # 扇状の光と同じ「角度(ラジアン)」で判定
+                angle = math.atan2(dy, dx)
+
+                # 角度を「度(-180〜180)」に変換して全8方向を判定
+                deg = math.degrees(angle)
+                
+                # 上方向（-90度付近）
+                if -112.5 < deg <= -67.5:
+                    res["up"] = True
+                # 下方向（90度付近）
+                elif 67.5 < deg <= 112.5:
+                    res["down"] = True
+                # 左方向（180度付近）
+                elif deg > 157.5 or deg <= -157.5:
+                    res["left"] = True
+                # 右方向（0度付近）
+                elif -22.5 < deg <= 22.5:
+                    res["right"] = True
+                
+                # 斜め入力（必要なら追加できます）
+                # 例：右上
+                elif -67.5 < deg <= -22.5:
+                    res["up"] = True
+                    res["right"] = True
+                # 同様に他の斜めも設定可能
         return res
 
 async def play_game(screen):
