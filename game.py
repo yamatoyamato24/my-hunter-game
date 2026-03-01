@@ -5,7 +5,7 @@ import math
 # --- 天気を取得する関数 ---
 def get_real_weather():
     # デフォルトは晴れ
-    result = "Clear"
+    result = "Snow"
     try:
         import requests
         # ここにご自身のキーを入れてください
