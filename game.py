@@ -2,6 +2,25 @@ import pygame
 import asyncio
 import math
 
+# --- 天気を取得する関数 ---
+def get_real_weather():    
+    try:
+        import requests
+        # ここにご自身のキーを入れてください
+        api_key = "0a33b88275e1a3a4034a80ab8909f3cf" 
+        city = "Kobe"
+        url = f"http://api.openweathermap.org{city}&appid={api_key}"
+        
+        # タイムアウトを1秒にして、遅延を防ぐ
+        response = requests.get(url, timeout=1.0)
+        if response.status_code == 200:
+            data = response.json()
+            return data["weather"][0]["main"] # ["weather"][0] が正しい階層です
+    except Exception as e:
+        print(f"Weather load error: {e}")
+    # 失敗したときや、requestsがない環境（スマホ）では晴れにする
+    return "Clear"
+
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
     try:
@@ -82,13 +101,32 @@ class Enemy:
 
 class Background:
     def __init__(self):
+        # 起動時に天気を取得
+        self.weather = get_real_weather()
+        
+        # 天気色の設定
+        weather_colors = {
+            "Clear": (135, 206, 235),  # 晴れ
+            "Clouds": (169, 169, 169), # くもり
+            "Rain": (70, 70, 90),      # 雨
+            "Snow": (240, 248, 255),   # 雪
+            "Drizzle": (70, 70, 90)    # 霧雨（雨と同じにする）
+        }
+        self.base_color = weather_colors.get(self.weather, (34, 139, 34))
+
         try:
+            # 画像の読み込み
             self.image = pygame.image.load("assets/background.png").convert()
-            # 縦長画面(800x1500)に合わせて拡大
             self.image = pygame.transform.scale(self.image, (800, 1500))
+            
+            # 【重要】画像の上に半透明の色を乗せる
+            overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
+            overlay.fill((*self.base_color, 100)) # 100は透明度（0〜255）
+            self.image.blit(overlay, (0, 0))
         except:
             self.image = pygame.Surface((800, 1500))
-            self.image.fill((34, 139, 34))
+            self.image.fill(self.base_color)
+            
         self.rect = self.image.get_rect()
 
     def draw(self, screen):
