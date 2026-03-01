@@ -3,23 +3,21 @@ import asyncio
 import math
 
 # --- 天気を取得する関数 ---
-def get_real_weather():    
+def get_real_weather():
+    # デフォルトは晴れ
+    result = "Clear"
     try:
         import requests
         # ここにご自身のキーを入れてください
         api_key = "0a33b88275e1a3a4034a80ab8909f3cf" 
         city = "Kobe"
-        url = f"http://api.openweathermap.org{city}&appid={api_key}"
-        
-        # タイムアウトを1秒にして、遅延を防ぐ
-        response = requests.get(url, timeout=1.0)
+        # タイムアウトを極短（0.5秒）にして、ネットが遅くてもゲームを優先する
+        response = requests.get(f"http://api.openweathermap.org{city}&appid={api_key}", timeout=0.5)
         if response.status_code == 200:
-            data = response.json()
-            return data["weather"][0]["main"] # ["weather"][0] が正しい階層です
-    except Exception as e:
-        print(f"Weather load error: {e}")
-    # 失敗したときや、requestsがない環境（スマホ）では晴れにする
-    return "Clear"
+            result = response.json()["weather"][0]["main"] # [0]が必要な場合があります
+    except:
+        pass # 失敗したらClearのまま
+    return result
 
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
@@ -101,36 +99,42 @@ class Enemy:
 
 class Background:
     def __init__(self):
+        # 最初に真っ新なキャンバスを作る（サイズを800x1500に強制固定）
+        self.image = pygame.Surface((800, 1500))
+        
+        # 天気を取得して色を決める
         # 起動時に天気を取得
         self.weather = get_real_weather()
         
         # 天気色の設定
-        weather_colors = {
+        colors = {
             "Clear": (135, 206, 235),  # 晴れ
             "Clouds": (169, 169, 169), # くもり
             "Rain": (70, 70, 90),      # 雨
             "Snow": (240, 248, 255),   # 雪
             "Drizzle": (70, 70, 90)    # 霧雨（雨と同じにする）
         }
-        self.base_color = weather_colors.get(self.weather, (34, 139, 34))
+        self.base_color = colors.get(self.weather, (34, 139, 34))
 
         try:
-            # 画像の読み込み
-            self.image = pygame.image.load("assets/background.png").convert()
-            self.image = pygame.transform.scale(self.image, (800, 1500))
+            raw_img = pygame.image.load("assets/background.png").convert()
+            # ここでサイズを強制的に 800x1500 にリサイズ
+            self.image = pygame.transform.scale(raw_img, (800, 1500))
             
-            # 【重要】画像の上に半透明の色を乗せる
+            # 画像の上に天気の色の「薄い膜」を乗せる（サイズ崩れ防止）
             overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
-            overlay.fill((*self.base_color, 100)) # 100は透明度（0〜255）
+            overlay.fill((*self.base_color, 80)) # 80は透明度。薄く色を付ける
             self.image.blit(overlay, (0, 0))
         except:
-            self.image = pygame.Surface((800, 1500))
+            # 画像がない場合は単色で塗りつぶし
             self.image.fill(self.base_color)
             
         self.rect = self.image.get_rect()
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
+        # 描画位置も (0, 0) に固定
+        screen.blit(self.image, (0, 0))
 
 class Controller:
     def get_move_vector(self):
