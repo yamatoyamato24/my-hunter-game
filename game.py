@@ -1,23 +1,21 @@
 import pygame
 import asyncio
 import math
+import datetime # requestsの代わりにこれを使います
 
-# --- 天気を取得する関数 ---
-def get_real_weather():
-    # デフォルトは晴れ
-    result = "Snow"
-    try:
-        import requests
-        # ここにご自身のキーを入れてください
-        api_key = "0a33b88275e1a3a4034a80ab8909f3cf" 
-        city = "Kobe"
-        # タイムアウトを極短（0.5秒）にして、ネットが遅くてもゲームを優先する
-        response = requests.get(f"http://api.openweathermap.org{city}&appid={api_key}", timeout=0.5)
-        if response.status_code == 200:
-            result = response.json()["weather"][0]["main"] # [0]が必要な場合があります
-    except:
-        pass # 失敗したらClearのまま
-    return result
+def get_time_weather():
+    # 現在の「時」を取得 (0〜23)
+    # 日本時間で判定されます
+    now_hour = datetime.datetime.now().hour
+    
+    if 6 <= now_hour < 16:
+        return "Clear"   # 6時〜15時：昼間（晴れ）
+    elif 16 <= now_hour < 19:
+        return "Clouds"  # 16時〜18時：夕方（くもり・オレンジ風）
+    elif 19 <= now_hour < 24 or 0 <= now_hour < 6:
+        return "Rain"    # 19時〜翌5時：夜（雨の紺色を流用）
+    
+    return "Clear"
 
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
@@ -97,44 +95,40 @@ class Enemy:
     def draw(self, screen):
         screen.blit(self.image, self.rect)
 
+
 class Background:
     def __init__(self):
-        # 最初に真っ新なキャンバスを作る（サイズを800x1500に強制固定）
+        # 1. 800x1500のキャンバスを固定作成
         self.image = pygame.Surface((800, 1500))
         
-        # 天気を取得して色を決める
-        # 起動時に天気を取得
-        self.weather = get_real_weather()
+        # 2. 【変更】通信不要の時間帯判定に切り替え
+        self.weather = get_time_weather()
         
-        # 天気色の設定
         colors = {
-            "Clear": (135, 206, 235),  # 晴れ
-            "Clouds": (169, 169, 169), # くもり
-            "Rain": (70, 70, 90),      # 雨
-            "Snow": (240, 248, 255),   # 雪
-            "Drizzle": (70, 70, 90)    # 霧雨（雨と同じにする）
+            "Clear": (135, 206, 235),  # 昼：スカイブルー
+            "Clouds": (255, 140, 0),   # 夕方：オレンジ（夕焼け風に変更！）
+            "Rain": (25, 25, 112),     # 夜：ミッドナイトブルー
+            "Snow": (240, 248, 255)    # 雪：アリスブルー（冬の朝など用）
         }
         self.base_color = colors.get(self.weather, (34, 139, 34))
 
+        # 3. 背景画像の読み込みと合成
         try:
             raw_img = pygame.image.load("assets/background.png").convert()
-            # ここでサイズを強制的に 800x1500 にリサイズ
             self.image = pygame.transform.scale(raw_img, (800, 1500))
             
-            # 画像の上に天気の色の「薄い膜」を乗せる（サイズ崩れ防止）
+            # 時間帯の色の「薄い膜」を乗せる
             overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
-            overlay.fill((*self.base_color, 80)) # 80は透明度。薄く色を付ける
+            overlay.fill((*self.base_color, 90)) # 90は透明度
             self.image.blit(overlay, (0, 0))
         except:
-            # 画像がない場合は単色で塗りつぶし
             self.image.fill(self.base_color)
             
         self.rect = self.image.get_rect()
 
     def draw(self, screen):
-        screen.blit(self.image, self.rect)
-        # 描画位置も (0, 0) に固定
         screen.blit(self.image, (0, 0))
+
 
 class Controller:
     def get_move_vector(self):
