@@ -35,7 +35,19 @@ class WeatherEffect:
     def __init__(self, weather_type):
         self.weather = weather_type
         self.particles = []
-        # エフェクトの粒を生成
+        # 雲のデータ（雨と曇りの時だけ使う）
+        self.clouds = []
+        if self.weather in ["Rain", "Clouds"]:
+            for _ in range(5): # 5個くらいの雲
+                self.clouds.append({
+                    "x": random.randint(-100, 800),
+                    "y": random.randint(0, 150), # 画面の上の方
+                    "w": random.randint(200, 400), # 雲の横幅
+                    "h": random.randint(80, 120),  # 雲の高さ
+                    "speed": random.uniform(0.2, 0.5)
+                })
+
+        # 粒（雨や雪）のエフェクト生成
         for _ in range(50):
             self.particles.append({
                 "x": random.randint(0, 800),
@@ -45,6 +57,11 @@ class WeatherEffect:
             })
 
     def update(self):
+        # 雲をゆっくり動かす
+        for c in self.clouds:
+            c["x"] += c["speed"]
+            if c["x"] > 800: c["x"] = -c["w"]
+
         for p in self.particles:
             if self.weather == "Rain" or self.weather == "Snow":
                 p["y"] += p["speed"] # 下に落ちる
@@ -55,13 +72,24 @@ class WeatherEffect:
                 p["y"] -= p["speed"] * 0.1
             
             # 画面外に出たら戻す
-            if p["y"] > 1500: p["y"] = -10
-            if p["x"] < 0: p["x"] = 800
+            if p["y"] > 1500: p["y"] = -20
+            if p["x"] < -20: p["x"] = 800
+            if p["x"] > 820: p["x"] = -20
 
     def draw(self, screen):
+
+        # 1. 雲を先に描く（半透明の楕円）
+        for c in self.clouds:
+            # 雲用の半透明Surfaceを作成
+            cloud_surf = pygame.Surface((c["w"], c["h"]), pygame.SRCALPHA)
+            # 雨なら黒っぽく、曇りなら灰色っぽく
+            color = (20, 20, 40, 160) if self.weather == "Rain" else (100, 100, 100, 140)
+            pygame.draw.ellipse(cloud_surf, color, (0, 0, c["w"], c["h"]))
+            screen.blit(cloud_surf, (c["x"], c["y"]))
+
         for p in self.particles:
             if self.weather == "Rain":
-                pygame.draw.line(screen, (100, 100, 255), (p["x"], p["y"]), (p["x"], p["y"]+10), 1)
+                pygame.draw.line(screen, (100, 100, 255), (p["x"], p["y"]), (p["x"], p["y"]+15), 1)
             elif self.weather == "Snow":
                 pygame.draw.circle(screen, (255, 255, 255), (int(p["x"]), int(p["y"])), p["size"])
             elif self.weather == "Clouds": # 落ち葉風のオレンジ
