@@ -2,6 +2,7 @@ import pygame
 import asyncio
 import math
 import datetime # requestsの代わりにこれを使います
+import random
 
 def get_time_weather():
     # 現在の「時」を取得 (0〜23)
@@ -29,6 +30,44 @@ def load_game_image(path, target_width):
         surf = pygame.Surface((target_width, target_width))
         surf.fill((200, 200, 200))
         return surf
+
+class WeatherEffect:
+    def __init__(self, weather_type):
+        self.weather = weather_type
+        self.particles = []
+        # エフェクトの粒を生成
+        for _ in range(50):
+            self.particles.append({
+                "x": random.randint(0, 800),
+                "y": random.randint(0, 1500),
+                "speed": random.uniform(2, 5),
+                "size": random.randint(2, 5)
+            })
+
+    def update(self):
+        for p in self.particles:
+            if self.weather == "Rain" or self.weather == "Snow":
+                p["y"] += p["speed"] # 下に落ちる
+            elif self.weather == "Clouds": # 夕方は風で横に流れる
+                p["x"] -= p["speed"]
+                p["y"] += p["speed"] * 0.2
+            else: # 晴れはゆっくり浮遊
+                p["y"] -= p["speed"] * 0.1
+            
+            # 画面外に出たら戻す
+            if p["y"] > 1500: p["y"] = -10
+            if p["x"] < 0: p["x"] = 800
+
+    def draw(self, screen):
+        for p in self.particles:
+            if self.weather == "Rain":
+                pygame.draw.line(screen, (100, 100, 255), (p["x"], p["y"]), (p["x"], p["y"]+10), 1)
+            elif self.weather == "Snow":
+                pygame.draw.circle(screen, (255, 255, 255), (int(p["x"]), int(p["y"])), p["size"])
+            elif self.weather == "Clouds": # 落ち葉風のオレンジ
+                pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
+            elif self.weather == "Clear": # 太陽の光の粉（黄色）
+                pygame.draw.circle(screen, (255, 255, 200, 150), (int(p["x"]), int(p["y"])), 2)
 
 class Player:
     def __init__(self):
@@ -280,6 +319,8 @@ async def play_game(screen):
 
     # クラスの初期化
     bg = Background()
+    # 背景が持っている weather 情報を渡してエフェクトを作成
+    effect = WeatherEffect(bg.weather) 
     player = Player()
     enemy = Enemy()
     controller = Controller()
@@ -343,6 +384,11 @@ async def play_game(screen):
 
         # --- 描画処理 ---
         bg.draw(screen)
+
+        # ★追加：エフェクトの更新と描画
+        effect.update()
+        effect.draw(screen)
+
         player.draw(screen)
         enemy.draw(screen)
         controller.draw(screen)
