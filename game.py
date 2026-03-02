@@ -137,10 +137,7 @@ class Enemy:
 
 class Background:
     def __init__(self):
-        # 1. 800x1500のキャンバスを固定作成
-        self.image = pygame.Surface((800, 1500))
-        
-        # 2. 【変更】通信不要の時間帯判定に切り替え
+        # 通信不要の時間帯判定に切り替え
         self.weather = get_time_weather()
         
         colors = {
@@ -157,16 +154,21 @@ class Background:
             self.image = pygame.transform.scale(raw_img, (800, 1500))
             
             # 時間帯の色の「薄い膜」を乗せる
-            overlay = pygame.Surface((800, 1500), pygame.SRCALPHA)
-            overlay.fill((*self.base_color, 90)) # 90は透明度
-            self.image.blit(overlay, (0, 0))
+            self.overlay = pygame.Surface(800, 1500)
+            self.overlay.fill(self.base_color)
+            # 透明度をここで設定（0〜255。100くらいが画像も見えて丁度いいです）
+            self.overlay.set_alpha(100) 
+
         except:
+            self.image = pygame.Surface((800, 1500))
             self.image.fill(self.base_color)
-            
-        self.rect = self.image.get_rect()
+            self.overlay = None # 画像がない場合はオーバーレイ不要
 
     def draw(self, screen):
         screen.blit(self.image, (0, 0))
+        # その上に色付きの膜を重ねて描く（これで確実に色が変わります）
+        if self.overlay:
+            screen.blit(self.overlay, (0, 0))
 
 
 class Controller:
