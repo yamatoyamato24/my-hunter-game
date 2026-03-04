@@ -19,7 +19,7 @@ def get_time_weather():
         if random.random() < 0.3:
             return "Rain"
         else:
-            return "Clear"
+            return "Night"
 
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
@@ -40,7 +40,7 @@ class WeatherEffect:
         self.particles = []
         # 雲のデータ（雨と曇りの時だけ使う）
         self.clouds = []
-        if self.weather in ["Clouds"]:
+        if self.weather in ["Rain","Clouds"]:
             for _ in range(5): # 5個くらいの雲
                 self.clouds.append({"x": random.randint(0, 800), "y": random.randint(0, 150), "w": 300, "h": 100, "speed": 0.3})
 
@@ -55,26 +55,49 @@ class WeatherEffect:
             })
 
     def update(self):
+        # 雲の移動
+        for c in self.clouds:
+            c["x"] += c["speed"]
+            if c["x"] > 800: c["x"] = -300
         # 雲をゆっくり動かす
         for p in self.particles:
-            if self.weather == "Night":
-                # 夜は動かさず、透明度をランダムに変えて「またたき」を表現
-                p["alpha"] = random.randint(100, 255)
+            if self.weather == "Rain":
+                p["y"] += p["speed"] # 雨は下に落ちる
+            elif self.weather == "Night":
+                p["alpha"] = random.randint(100, 255) # 星はまたたく
             elif self.weather == "Clear":
                 p["y"] -= p["speed"] * 0.5 # 昼は上昇
             elif self.weather == "Clouds":
                 p["x"] -= p["speed"] # 夕方は横
             
-            if p["y"] < 0: p["y"] = 1500
-            if p["x"] < 0: p["x"] = 800
+            # 画面外ループ
+            if p["y"] > 1500: p["y"] = -20
+            if p["y"] < -20: p["y"] = 1500
+            if p["x"] < -20: p["x"] = 800
+            if p["x"] > 820: p["x"] = -20
 
     def draw(self, screen):
-
+        # 1. 雲の描画
+        for c in self.clouds:
+            cloud_surf = pygame.Surface((c["w"], c["h"]), pygame.SRCALPHA)
+            color = (20, 20, 40, 160) if self.weather == "Rain" else (100, 100, 100, 140)
+            pygame.draw.ellipse(cloud_surf, color, (0, 0, c["w"], c["h"]))
+            screen.blit(cloud_surf, (c["x"], c["y"]))
+        
+        # 2 粒の描画
         for p in self.particles:
             if self.weather == "Rain":
                 # 雨の線を描画
                 pygame.draw.line(screen, (120, 120, 255), (p["x"], p["y"]), (p["x"], p["y"]+15), 1)
-            
+            elif self.weather == "Night":
+                s = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
+                pygame.draw.circle(s, (255, 255, 200, p["alpha"]), (p["size"], p["size"]), p["size"])
+                screen.blit(s, (p["x"], p["y"]))
+            elif self.weather == "Clear":
+                pygame.draw.circle(screen, (255, 255, 200, 150), (int(p["x"]), int(p["y"])), 2)
+            elif self.weather == "Clouds":
+                pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
+
 
         for p in self.particles:
             if self.weather == "Night":
@@ -159,8 +182,7 @@ class Background:
     def __init__(self,weather): #引数を追加
         self.weather = weather
         # 通信不要の時間帯判定に切り替え
-        self.weather = get_time_weather()
-        
+
         colors = {
             "Clear": (135, 206, 235),  # 昼：スカイブルー
             "Clouds": (255, 140, 0),   # 夕方：オレンジ（夕焼け風に変更！）
@@ -193,7 +215,47 @@ class Background:
 
 
 class Controller:
+    def __init__(self):
+        # 配置設定
+        self.cx, self.cy = 400, 1200 
+        self.pad_radius = 220 
+        self.font = pygame.font.SysFont(None, 70)
+
+    def get_input(self):
+        """8方向判定用（今の移動ロジックで使用）"""
+        m_pos = pygame.mouse.get_pos()
+        m_pressed = pygame.mouse.get_pressed()[0]
+        res = {"up": False, "down": False, "left": False, "right": False}
+        
+        if m_pressed:
+            dx = m_pos[0] - self.cx
+            dy = m_pos[1] - self.cy
+            dist_sq = dx**2 + dy**2
+
+            if 10**2 < dist_sq < self.pad_radius**2:
+                deg = math.degrees(math.atan2(dy, dx))
+                
+                # 8方向の角度判定
+                if -22.5 < deg <= 22.5:
+                    res["right"] = True
+                elif 22.5 < deg <= 67.5:
+                    res["right"] = res["down"] = True
+                elif 67.5 < deg <= 112.5:
+                    res["down"] = True
+                elif 112.5 < deg <= 157.5:
+                    res["left"] = res["down"] = True
+                elif deg > 157.5 or deg <= -157.5:
+                    res["left"] = True
+                elif -157.5 < deg <= -112.5:
+                    res["left"] = res["up"] = True
+                elif -112.5 < deg <= -67.5:
+                    res["up"] = True
+                elif -67.5 < deg <= -22.5:
+                    res["right"] = res["up"] = True
+        return res
+
     def get_move_vector(self):
+        """滑らかな全方向移動用（将来的に使うならこちら）"""
         m_pos = pygame.mouse.get_pos()
         m_pressed = pygame.mouse.get_pressed()[0]
         if not m_pressed: return (0, 0)
@@ -202,40 +264,26 @@ class Controller:
         dy = m_pos[1] - self.cy
         dist = math.sqrt(dx**2 + dy**2)
 
-        # パッドの範囲内なら、正規化（1か-1など）した方向を返す
         if 10 < dist < self.pad_radius:
-            return (dx/dist, dy/dist) # 斜め移動もスムーズになります
+            return (dx/dist, dy/dist)
         return (0, 0)
 
-    def __init__(self):
-        # 画面の下の方（y=1200あたり）に配置
-        self.cx, self.cy = 400, 1200 
-        self.pad_radius = 220 
-        self.font = pygame.font.SysFont(None, 70)
-
     def draw(self, screen):
-        # 1500の画面全体を覆うSurface
+        """コントローラーの描画"""
         pad_surf = pygame.Surface((800, 1500), pygame.SRCALPHA)
         m_pos = pygame.mouse.get_pos()
-        m_pressed = pygame.mouse.get_pressed()[0] # 左クリック/タッチ
+        m_pressed = pygame.mouse.get_pressed()[0]
 
-        # 1. 土台の丸（暗いグレー）
+        # 1. 土台
         pygame.draw.circle(pad_surf, (40, 40, 40, 150), (self.cx, self.cy), self.pad_radius)
 
-        # 2. 扇状の「光」の描画
+        # 2. 扇状の光
         if m_pressed:
             dx = m_pos[0] - self.cx
             dy = m_pos[1] - self.cy
-            dist_sq = dx**2 + dy**2
-            
-            # 半径の範囲内なら、触っている角度を計算
-            if 10**2 < dist_sq < self.pad_radius**2:
-                import math
-                # 角度（ラジアン）を取得 (-π to π)
+            if 10**2 < dx**2 + dy**2 < self.pad_radius**2:
                 angle = math.atan2(dy, dx)
-                
-                # 触っている方向を扇状に光らせる (黄色)
-                # 45度(π/4)ずつの範囲で描画
+                # 45度(π/4)の範囲を計算
                 start_angle = (math.floor((angle + math.pi/8) / (math.pi/4)) * (math.pi/4)) - math.pi/8
                 points = [
                     (self.cx, self.cy),
@@ -244,80 +292,24 @@ class Controller:
                 ]
                 pygame.draw.polygon(pad_surf, (255, 255, 0, 150), points)
 
-        # 3. 扇状の「白い枠線」を描く
-        import math
+        # 3. 枠線とリング
         for i in range(8):
             angle = i * (math.pi / 4) + math.pi/8
-            # 中心から外側へ引く境界線
             end_x = self.cx + math.cos(angle) * self.pad_radius
             end_y = self.cy + math.sin(angle) * self.pad_radius
             pygame.draw.line(pad_surf, (255, 255, 255, 100), (self.cx, self.cy), (end_x, end_y), 2)
 
-        # 4. 外枠のリング
         pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), self.pad_radius, 5)
-        # 中心に小さな円（飾り）
         pygame.draw.circle(pad_surf, (255, 255, 255, 200), (self.cx, self.cy), 10)
 
-        # 5. 矢印のガイド表示
+        # 4. 矢印
         arrows = [("▲", 0, -150), ("▼", 0, 150), ("◀", -150, 0), ("▶", 150, 0)]
         for arrow, ox, oy in arrows:
             txt = self.font.render(arrow, True, (255, 255, 255, 180))
             pad_surf.blit(txt, txt.get_rect(center=(self.cx + ox, self.cy + oy)))
 
         screen.blit(pad_surf, (0, 0))
-
-    def get_input(self):
-        mouse_pos = pygame.mouse.get_pos()
-        # [0]を付けて左クリック/タップのみ判定
-        mouse_pressed = pygame.mouse.get_pressed()[0]
-        res = {"up": False, "down": False, "left": False, "right": False}
         
-        if mouse_pressed:
-            # 配列のインデックス指定で計算（エラー防止）
-            dx = mouse_pos[0] - self.cx
-            dy = mouse_pos[1] - self.cy
-            dist_sq = dx**2 + dy**2
-
-            # 遊び（中心の無反応地帯）を作って誤操作防止
-            # パッドの円内に指があるか判定
-            if 10**2 < dist_sq < self.pad_radius**2:
-                # 角度（度数法）に変換
-                import math
-                deg = math.degrees(math.atan2(dy, dx))
-                
-                # --- 45度ずつの範囲で8方向を判定 ---
-                
-                # 右 ( -22.5 〜 22.5 )
-                if -22.5 < deg <= 22.5:
-                    res["right"] = True
-                # 右下 ( 22.5 〜 67.5 )
-                elif 22.5 < deg <= 67.5:
-                    res["right"] = True
-                    res["down"] = True
-                # 下 ( 67.5 〜 112.5 )
-                elif 67.5 < deg <= 112.5:
-                    res["down"] = True
-                # 左下 ( 112.5 〜 157.5 )
-                elif 112.5 < deg <= 157.5:
-                    res["left"] = True
-                    res["down"] = True
-                # 左 ( 157.5以上 または -157.5以下 )
-                elif deg > 157.5 or deg <= -157.5:
-                    res["left"] = True
-                # 左上 ( -157.5 〜 -112.5 )
-                elif -157.5 < deg <= -112.5:
-                    res["left"] = True
-                    res["up"] = True
-                # 上 ( -112.5 〜 -67.5 )
-                elif -112.5 < deg <= -67.5:
-                    res["up"] = True
-                # 右上 ( -67.5 〜 -22.5 )
-                elif -67.5 < deg <= -22.5:
-                    res["right"] = True
-                    res["up"] = True
-
-        return res
-
 async def play_game(screen):
     # ★開始直後に一瞬だけ休ませる（ブラウザの読み込み待ち）
     await asyncio.sleep(0.1) 
