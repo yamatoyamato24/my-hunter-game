@@ -13,10 +13,13 @@ def get_time_weather():
         return "Clear"   # 6時〜15時：昼間（晴れ）
     elif 16 <= now_hour < 19:
         return "Clouds"  # 16時〜18時：夕方（くもり・オレンジ風）
-    elif 19 <= now_hour < 24 or 0 <= now_hour < 6:
-        return "Rain"    # 19時〜翌5時：夜（雨の紺色を流用）
-    
-    return "Clear"
+    else:
+    # --- 夜の判定 ---
+        # 0.0 〜 1.0 のランダムな数字を引き、0.3未満（30%）なら雨にする
+        if random.random() < 0.3:
+            return "Rain"
+        else:
+            return "Clear"
 
 # --- 画像読み込み関数（縦横比を維持） ---
 def load_game_image(path, target_width):
@@ -37,66 +40,55 @@ class WeatherEffect:
         self.particles = []
         # 雲のデータ（雨と曇りの時だけ使う）
         self.clouds = []
-        if self.weather in ["Rain", "Clouds"]:
+        if self.weather in ["Clouds"]:
             for _ in range(5): # 5個くらいの雲
-                self.clouds.append({
-                    "x": random.randint(-100, 800),
-                    "y": random.randint(0, 150), # 画面の上の方
-                    "w": random.randint(200, 400), # 雲の横幅
-                    "h": random.randint(80, 120),  # 雲の高さ
-                    "speed": random.uniform(0.2, 0.5)
-                })
+                self.clouds.append({"x": random.randint(0, 800), "y": random.randint(0, 150), "w": 300, "h": 100, "speed": 0.3})
 
         # 粒（雨や雪）のエフェクト生成
-        for _ in range(50):
+        for _ in range(60):
             self.particles.append({
                 "x": random.randint(0, 800),
                 "y": random.randint(0, 1500),
-                "speed": random.uniform(2, 5),
-                "size": random.randint(2, 5)
+                "speed": random.uniform(1, 3),
+                "size": random.randint(1, 3),
+                "alpha": random.randint(100, 255) # またたき用
             })
 
     def update(self):
         # 雲をゆっくり動かす
-        for c in self.clouds:
-            c["x"] += c["speed"]
-            if c["x"] > 800: c["x"] = -c["w"]
-
         for p in self.particles:
-            if self.weather == "Rain" or self.weather == "Snow":
-                p["y"] += p["speed"] # 下に落ちる
-            elif self.weather == "Clouds": # 夕方は風で横に流れる
-                p["x"] -= p["speed"]
-                p["y"] += p["speed"] * 0.2
-            else: # 晴れはゆっくり浮遊
-                p["y"] -= p["speed"] * 0.1
+            if self.weather == "Night":
+                # 夜は動かさず、透明度をランダムに変えて「またたき」を表現
+                p["alpha"] = random.randint(100, 255)
+            elif self.weather == "Clear":
+                p["y"] -= p["speed"] * 0.5 # 昼は上昇
+            elif self.weather == "Clouds":
+                p["x"] -= p["speed"] # 夕方は横
             
-            # 画面外に出たら戻す
-            if p["y"] > 1500: p["y"] = -20
-            if p["x"] < -20: p["x"] = 800
-            if p["x"] > 820: p["x"] = -20
+            if p["y"] < 0: p["y"] = 1500
+            if p["x"] < 0: p["x"] = 800
 
     def draw(self, screen):
 
-        # 1. 雲を先に描く（半透明の楕円）
-        for c in self.clouds:
-            # 雲用の半透明Surfaceを作成
-            cloud_surf = pygame.Surface((c["w"], c["h"]), pygame.SRCALPHA)
-            # 雨なら黒っぽく、曇りなら灰色っぽく
-            color = (20, 20, 40, 160) if self.weather == "Rain" else (100, 100, 100, 140)
-            pygame.draw.ellipse(cloud_surf, color, (0, 0, c["w"], c["h"]))
-            screen.blit(cloud_surf, (c["x"], c["y"]))
-
         for p in self.particles:
             if self.weather == "Rain":
-                pygame.draw.line(screen, (100, 100, 255), (p["x"], p["y"]), (p["x"], p["y"]+15), 1)
-            elif self.weather == "Snow":
-                pygame.draw.circle(screen, (255, 255, 255), (int(p["x"]), int(p["y"])), p["size"])
-            elif self.weather == "Clouds": # 落ち葉風のオレンジ
-                pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
-            elif self.weather == "Clear": # 太陽の光の粉（黄色）
-                pygame.draw.circle(screen, (255, 255, 200, 150), (int(p["x"]), int(p["y"])), 2)
+                # 雨の線を描画
+                pygame.draw.line(screen, (120, 120, 255), (p["x"], p["y"]), (p["x"], p["y"]+15), 1)
+            
 
+        for p in self.particles:
+            if self.weather == "Night":
+                # 夜：キラキラ光る星を描画
+                s = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
+                pygame.draw.circle(s, (255, 255, 200, p["alpha"]), (p["size"], p["size"]), p["size"])
+                screen.blit(s, (p["x"], p["y"]))
+            elif self.weather == "Clear":
+                # 昼：光の粉
+                pygame.draw.circle(screen, (255, 255, 200, 150), (int(p["x"]), int(p["y"])), 2)
+            elif self.weather == "Clouds":
+                # 夕方：落ち葉
+                pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
+       
 class Player:
     def __init__(self):
         self.image = load_game_image("assets/run_away.png", 60)
@@ -124,8 +116,6 @@ class Player:
         if self.invincible_timer > 0: 
             self.invincible_timer -= 1
 
-        
-
         self.rect.clamp_ip(pygame.Rect(0, 0, 800, 1500))
 
     def draw(self, screen):
@@ -146,6 +136,8 @@ class Player:
             # 通常時はそのまま表示
             screen.blit(self.image, self.rect)
 
+
+
 class Enemy:
     def __init__(self):
         self.image = load_game_image("assets/enemy.png", 300)
@@ -164,7 +156,8 @@ class Enemy:
 
 
 class Background:
-    def __init__(self):
+    def __init__(self,weather): #引数を追加
+        self.weather = weather
         # 通信不要の時間帯判定に切り替え
         self.weather = get_time_weather()
         
@@ -329,6 +322,9 @@ async def play_game(screen):
     # ★開始直後に一瞬だけ休ませる（ブラウザの読み込み待ち）
     await asyncio.sleep(0.1) 
 
+    # --- 1. まず天気を一回だけ決める ---
+    current_weather = get_time_weather()
+
     # --- フォント読み込み（ここで1回だけ行う） ---
     try:
         font_path = "assets/NotoSansJP-Regular.ttf"
@@ -347,10 +343,10 @@ async def play_game(screen):
     except:
         pass
 
-    # クラスの初期化
-    bg = Background()
-    # 背景が持っている weather 情報を渡してエフェクトを作成
-    effect = WeatherEffect(bg.weather) 
+    # --- 2. 決まった天気を各クラスに渡す ---
+    # Backgroundクラスを、引数で天気を受け取れるように少し修正します
+    bg = Background(current_weather) 
+    effect = WeatherEffect(current_weather) 
     player = Player()
     enemy = Enemy()
     controller = Controller()
