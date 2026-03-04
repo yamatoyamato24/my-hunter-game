@@ -36,23 +36,26 @@ def load_game_image(path, target_width):
 
 class WeatherEffect:
     def __init__(self, weather_type):
-        self.weather = weather_type
-        self.particles = []
-        # 雲のデータ（雨と曇りの時だけ使う）
-        self.clouds = []
-        if self.weather in ["Rain","Clouds"]:
-            for _ in range(5): # 5個くらいの雲
-                self.clouds.append({"x": random.randint(0, 800), "y": random.randint(0, 150), "w": 300, "h": 100, "speed": 0.3})
+            self.weather = weather_type
+            self.particles = []
+            self.clouds = []
+            
+            # 雲の設定
+            if self.weather in ["Rain", "Clouds"]:
+                for _ in range(5):
+                    self.clouds.append({"x": random.randint(0, 800), "y": random.randint(0, 150), "w": 300, "h": 100, "speed": 0.3})
 
-        # 粒（雨や雪）のエフェクト生成
-        for _ in range(60):
-            self.particles.append({
-                "x": random.randint(0, 800),
-                "y": random.randint(0, 1500),
-                "speed": random.uniform(1, 3),
-                "size": random.randint(1, 3),
-                "alpha": random.randint(100, 255) # またたき用
-            })
+            # 粒のエフェクト生成
+            for _ in range(60):
+                # 雨の時だけスピードを速く(8〜12)設定する
+                spd = random.uniform(8, 12) if self.weather == "Rain" else random.uniform(1, 3)
+                self.particles.append({
+                    "x": random.randint(0, 800),
+                    "y": random.randint(0, 1500),
+                    "speed": spd,
+                    "size": random.randint(1, 3),
+                    "alpha": random.randint(100, 255)
+                })
 
     def update(self):
         # 雲の移動
@@ -87,7 +90,6 @@ class WeatherEffect:
         # 2 粒の描画
         for p in self.particles:
             if self.weather == "Rain":
-                # 雨の線を描画
                 pygame.draw.line(screen, (120, 120, 255), (p["x"], p["y"]), (p["x"], p["y"]+15), 1)
             elif self.weather == "Night":
                 s = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
@@ -98,20 +100,6 @@ class WeatherEffect:
             elif self.weather == "Clouds":
                 pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
 
-
-        for p in self.particles:
-            if self.weather == "Night":
-                # 夜：キラキラ光る星を描画
-                s = pygame.Surface((p["size"]*2, p["size"]*2), pygame.SRCALPHA)
-                pygame.draw.circle(s, (255, 255, 200, p["alpha"]), (p["size"], p["size"]), p["size"])
-                screen.blit(s, (p["x"], p["y"]))
-            elif self.weather == "Clear":
-                # 昼：光の粉
-                pygame.draw.circle(screen, (255, 255, 200, 150), (int(p["x"]), int(p["y"])), 2)
-            elif self.weather == "Clouds":
-                # 夕方：落ち葉
-                pygame.draw.rect(screen, (210, 105, 30), (p["x"], p["y"], 8, 4))
-       
 class Player:
     def __init__(self):
         self.image = load_game_image("assets/run_away.png", 60)
@@ -187,6 +175,7 @@ class Background:
             "Clear": (135, 206, 235),  # 昼：スカイブルー
             "Clouds": (255, 140, 0),   # 夕方：オレンジ（夕焼け風に変更！）
             "Rain": (25, 25, 112),     # 夜：ミッドナイトブルー
+            "Night": (25, 25, 112),   # ★晴れの夜も同じ色にする
             "Snow": (240, 248, 255)    # 雪：アリスブルー（冬の朝など用）
         }
         self.base_color = colors.get(self.weather, (34, 139, 34))
@@ -309,7 +298,7 @@ class Controller:
             pad_surf.blit(txt, txt.get_rect(center=(self.cx + ox, self.cy + oy)))
 
         screen.blit(pad_surf, (0, 0))
-        
+
 async def play_game(screen):
     # ★開始直後に一瞬だけ休ませる（ブラウザの読み込み待ち）
     await asyncio.sleep(0.1) 
